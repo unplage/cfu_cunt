@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>菌落计数器 - Colony Counter</title>
+    <script src="https://docs.opencv.org/4.8.0/opencv.js" async></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+        .canvas-container { position: relative; display: inline-block; }
+        #resultCanvas { max-width: 100%; height: auto; }
+        .loading { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
+        .param-slider { -webkit-appearance: none; appearance: none; height: 6px; background: #e5e7eb; border-radius: 5px; outline: none; }
+        .param-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 20px; height: 20px; background: #3b82f6; border-radius: 50%; cursor: pointer; }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+
+    <!-- Header -->
+    <header class="bg-blue-600 text-white p-4 shadow-lg sticky top-0 z-50">
+        <div class="flex items-center justify-between max-w-4xl mx-auto">
+            <h1 class="text-xl font-bold flex items-center gap-2">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                菌落计数器 Pro
+            </h1>
+            <span class="text-xs bg-blue-800 px-2 py-1 rounded">v1.0</span>
+        </div>
+    </header>
+
+    <main class="max-w-4xl mx-auto p-4 space-y-4">
+
+        <!-- Upload Section -->
+        <div class="bg-white rounded-xl shadow-md p-6 text-center" id="uploadSection">
+            <div class="border-4 border-dashed border-gray-300 rounded-lg p-8 hover:border-blue-400 transition-colors cursor-pointer" onclick="document.getElementById('fileInput').click()">
+                <svg class="w-16 h-16 mx-auto text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                <p class="text-gray-600 mb-2">点击上传或拍照</p>
+                <p class="text-sm text-gray-400">支持 JPG, PNG 格式</p>
+            </div>
+            <input type="file" id="fileInput" accept="image/*" class="hidden" onchange="handleImage(event)">
+            
+            <!-- Camera Button for Mobile -->
+            <button onclick="openCamera()" class="mt-4 w-full bg-green-500 text-white py-3 rounded-lg font-semibold hover:bg-green-600 transition flex items-center justify-center gap-2">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path></svg>
+                打开相机拍照
+            </button>
+            <input type="file" id="cameraInput" accept="image/*" capture="environment" class="hidden" onchange="handleImage(event)">
+        </div>
+
+        <!-- Processing Status -->
+        <div id="processingStatus" class="hidden bg-blue-50 border border-blue-200 rounded-xl p-6 text-center">
+            <div class="loading inline-block w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mb-3"></div>
+            <p class="text-blue-800 font-semibold">正在分析菌落...</p>
+            <p class="text-sm text-blue-600 mt-1" id="processStep">初始化 OpenCV...</p>
+        </div>
+
+        <!-- Results Section -->
+        <div id="resultsSection" class="hidden space-y-4">
+            
+            <!-- Count Display -->
+            <div class="bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl shadow-lg p-6 text-white text-center">
+                <p class="text-blue-100 text-sm uppercase tracking-wide mb-1">检测到的菌落数</p>
+                <p class="text-5xl font-bold" id="colonyCount">0</p>
+                <p class="text-blue-200 text-sm mt-2">CFU (Colony Forming Units)</p>
+            </div>
+
+            <!-- Image Display -->
+            <div class="bg-white rounded-xl shadow-md p-4">
+                <div class="flex justify-between items-center mb-3">
+                    <h3 class="font-semibold text-gray-800">检测结果</h3>
+                    <button onclick="downloadResult()" class="text-sm bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded transition">
+                        保存图片
+                    </button>
+                </div>
+                <div class="canvas-container w-full overflow-x-auto">
+                    <canvas id="resultCanvas"></canvas>
+                </div>
+            </div>
+
+            <!-- Statistics -->
+            <div class="bg-white rounded-xl shadow-md p-4">
+                <h3 class="font-semibold text-gray-800 mb-3">统计信息</h3>
+                <div class="grid grid-cols-2 gap-4 text-sm">
+                    <div class="bg-gray-50 p-3 rounded">
+                        <span class="text-gray-500">平均半径</span>
+                        <p class="font-semibold text-lg" id="avgRadius">- px</p>
+                    </div>
+                    <div class="bg-gray-50 p-3 rounded">
+                        <span class="text-gray-500">检测区域</span>
+                        <p class="font-semibold text-lg" id="plateArea">- %</p>
+                    </div>
+                    <div class="bg-gray-50 p-3 rounded">
+                        <span class="text-gray-500">最小菌落</span>
+                        <p class="font-semibold text-lg" id="minRadius">- px</p>
+                    </div>
+                    <div class="bg-gray-50 p-3 rounded">
+                        <span class="text-gray-500">最大菌落</span>
+                        <p class="font-semibold text-lg" id="maxRadius">- px</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Advanced Parameters -->
+            <div class="bg-white rounded-xl shadow-md p-4">
+                <div class="flex justify-between items-center mb-4 cursor-pointer" onclick="toggleParams()">
+                    <h3 class="font-semibold text-gray-800">高级参数调整</h3>
+                    <svg id="paramArrow" class="w-5 h-5 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                </div>
+                
+                <div id="paramSection" class="hidden space-y-4">
+                    <div>
+                        <label class="flex justify-between text-sm font-medium text-gray-700 mb-1">
+                            <span>最小菌落半径</span>
+                            <span id="minSigmaVal" class="text-blue-600">2.5</span>
+                        </label>
+                        <input type="range" id="minSigma" min="1" max="5" step="0.5" value="2.5" class="param-slider w-full" oninput="updateParam('minSigma', this.value)">
+                    </div>
+                    
+                    <div>
+                        <label class="flex justify-between text-sm font-medium text-gray-700 mb-1">
+                            <span>最大菌落半径</span>
+                            <span id="maxSigmaVal" class="text-blue-600">12</span>
+                        </label>
+                        <input type="range" id="maxSigma" min="6" max="20" step="1" value="12" class="param-slider w-full" oninput="updateParam('maxSigma', this.value)">
+                    </div>
+                    
+                    <div>
+                        <label class="flex justify-between text-sm font-medium text-gray-700 mb-1">
+                            <span>检测灵敏度</span>
+                            <span id="thresholdVal" class="text-blue-600">0.03</span>
+                        </label>
+                        <input type="range" id="threshold" min="0.01" max="0.1" step="0.01" value="0.03" class="param-slider w-full" oninput="updateParam('threshold', this.value)">
+                    </div>
+                    
+                    <div>
+                        <label class="flex justify-between text-sm font-medium text-gray-700 mb-1">
+                            <span>NMS距离阈值</span>
+                            <span id="nmsVal" class="text-blue-600">15</span>
+                        </label>
+                        <input type="range" id="nmsDist" min="5" max="30" step="1" value="15" class="param-slider w-full" oninput="updateParam('nmsDist', this.value)">
+                    </div>
+                    
+                    <button onclick="reprocess()" class="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition mt-4">
+                        重新分析
+                    </button>
+                </div>
+            </div>
+
+            <!-- New Analysis -->
+            <button onclick="resetAll()" class="w-full bg-gray-200 text-gray-800 py-3 rounded-lg font-semibold hover:bg-gray-300 transition">
+                分析新图片
+            </button>
+        </div>
+
+        <!-- Instructions -->
+        <div class="bg-yellow-50 border border-yellow-200 rounded-xl p-4 text-sm text-yellow-800">
+            <h4 class="font-semibold mb-2 flex items-center gap-2">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                使用提示
+            </h4>
+            <ul class="list-disc list-inside space-y-1 text-yellow-700">
+                <li>确保培养皿在照片中居中且清晰可见</li>
+                <li>光线均匀，避免强烈阴影或反光</li>
+                <li>如计数不准确，可尝试调整"高级参数"中的灵敏度</li>
+                <li>首次加载可能需要10-20秒初始化OpenCV</li>
+            </ul>
+        </div>
+
+    </main>
+
+    <script>
+        // Global variables
+        let cvReady = false;
+        let currentImage = null;
+        let currentResult = null;
+        let params = {
+            minSigma: 2.5,
+            maxSigma: 12,
+            threshold: 0.03,
+            nmsDist: 15,
+            intensity: 120,
+            contrast: 5
+        };
+
+        // Wait for OpenCV to load
+        function onOpenCvReady() {
+            cvReady = true;
+            console.log('OpenCV.js is ready');
+        }
+
+        // Check OpenCV loading
+        setInterval(() => {
+            if (typeof cv !== 'undefined' && !cvReady) {
+                onOpenCvReady();
+            }
+        }, 1000);
+
+        // Camera handling
+        function openCamera() {
+            document.getElementById('cameraInput').click();
+        }
+
+        // Image handling
+        function handleImage(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    currentImage = img;
+                    processImage();
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // Main processing function
+        async function processImage() {
+            if (!cvReady) {
+                alert('OpenCV正在初始化，请稍后再试...');
+                return;
+            }
+
+            if (!currentImage) return;
+
+            // Show processing status
+            document.getElementById('uploadSection').classList.add('hidden');
+            document.getElementById('processingStatus').classList.remove('hidden');
+            document.getElementById('resultsSection').classList.add('hidden');
+
+            // Use setTimeout to allow UI update
+            setTimeout(() => {
+                try {
+                    performDetection();
+                } catch (error) {
+                    console.error(error);
+                    alert('处理出错: ' + error.message);
+                    resetAll();
+                }
+            }, 100);
+        }
+
+        // Core detection algorithm
+        function performDetection() {
+            updateStep('读取图像...');
+            
+            // 1. Load image into OpenCV
+            let src = cv.imread(currentImage);
+            
+            // Resize if too large (performance optimization)
+            const maxDim = 1280;
+            let scale = 1;
+            if (Math.max(src.cols, src.rows) > maxDim) {
+                scale = maxDim / Math.max(src.cols, src.rows);
+                let dsize = new cv.Size(Math.round(src.cols * scale), Math.round(src.rows * scale));
+                cv.resize(src, src, dsize, 0, 0, cv.INTER_AREA);
+            }
+            
+            updateStep('颜色空间转换...');
+            
+            // 2. Convert to Lab and enhance L channel
+            let lab = new cv.Mat();
+            cv.cvtColor(src, lab, cv.COLOR_RGB2Lab);
+            let labPlanes = new cv.MatVector();
+            cv.split(lab, labPlanes);
+            let lChannel = labPlanes.get(0);
+            
+            // CLAHE enhancement
+            let clahe = new cv.CLAHE(3.0, new cv.Size(8, 8));
+            let lEnhanced = new cv.Mat();
+            clahe.apply(lChannel, lEnhanced);
+            
+            updateStep('检测菌落 (LoG)...');
+            
+            // 3. LoG Blob detection using simple approximation
+            // Note: OpenCV.js doesn't have blob_log, so we use Laplacian + findContours
+            let blobs = detectBlobsLoG(lEnhanced);
+            
+            updateStep('筛选有效区域...');
+            
+            // 4. Create plate mask (circle detection)
+            let plateMask = createPlateMask(lEnhanced);
+            
+            // 5. Filter blobs by plate mask and NMS
+            let centerX = lEnhanced.cols / 2;
+            let centerY = lEnhanced.rows / 2;
+            let plateRadius = Math.min(lEnhanced.cols, lEnhanced.rows) / 2 - 50;
+            
+            let filteredBlobs = [];
+            for (let blob of blobs) {
+                let dx = blob.x - centerX;
+                let dy = blob.y - centerY;
+                let dist = Math.sqrt(dx*dx + dy*dy);
+                
+                if (dist < plateRadius && blob.r > 2) {
+                    filteredBlobs.push(blob);
+                }
+            }
+            
+            updateStep('去除重复检测 (NMS)...');
+            
+            // 6. NMS
+            let nmsBlobs = nonMaxSuppression(filteredBlobs, params.nmsDist);
+            
+            updateStep('验证菌落质量...');
+            
+            // 7. Verify by intensity and contrast
+            let verifiedBlobs = verifyBlobs(nmsBlobs, lEnhanced);
+            
+            updateStep('绘制结果...');
+            
+            // 8. Draw results
+            let result = src.clone();
+            for (let blob of verifiedBlobs) {
+                let color = new cv.Scalar(255, 0, 0, 255);
+                let center = new cv.Point(blob.x, blob.y);
+                cv.circle(result, center, Math.round(blob.r), color, 2);
+                cv.circle(result, center, 1, new cv.Scalar(0, 255, 0, 255), 2);
+            }
+            
+            // Display result
+            cv.imshow('resultCanvas', result);
+            currentResult = result;
+            
+            // Update statistics
+            document.getElementById('colonyCount').textContent = verifiedBlobs.length;
+            
+            if (verifiedBlobs.length > 0) {
+                let radii = verifiedBlobs.map(b => b.r);
+                document.getElementById('avgRadius').textContent = (radii.reduce((a,b) => a+b, 0) / radii.length).toFixed(1) + ' px';
+                document.getElementById('minRadius').textContent = Math.min(...radii).toFixed(1) + ' px';
+                document.getElementById('maxRadius').textContent = Math.max(...radii).toFixed(1) + ' px';
+                document.getElementById('plateArea').textContent = Math.round((verifiedBlobs.length / (Math.PI * plateRadius * plateRadius / 1000)) * 100) / 100 + ' %';
+            }
+            
+            // Cleanup
+            src.delete();
+            lab.delete();
+            labPlanes.delete();
+            lChannel.delete();
+            lEnhanced.delete();
+            clahe.delete();
+            
+            // Show results
+            document.getElementById('processingStatus').classList.add('hidden');
+            document.getElementById('resultsSection').classList.remove('hidden');
+            
+            // Scroll to results
+            document.getElementById('resultsSection').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // LoG Blob detection approximation
+        function detectBlobsLoG(grayImg) {
+            let blobs = [];
+            
+            // Multi-scale detection using Gaussian blur + Laplacian
+            let sigmas = [];
+            for (let s = params.minSigma; s <= params.maxSigma; s += (params.maxSigma - params.minSigma) / 10) {
+                sigmas.push(s);
+            }
+            
+            for (let sigma of sigmas) {
+                let ksize = Math.round(sigma * 6) | 1; // Must be odd
+                if (ksize < 3) ksize = 3;
+                
+                let blurred = new cv.Mat();
+                let laplacian = new cv.Mat();
+                
+                cv.GaussianBlur(grayImg, blurred, new cv.Size(ksize, ksize), sigma);
+                cv.Laplacian(blurred, laplacian, cv.CV_64F, 3);
+                
+                // Find local maxima
+                let lapAbs = new cv.Mat();
+                cv.convertScaleAbs(laplacian, lapAbs);
+                
+                // Threshold
+                let thresh = new cv.Mat();
+                cv.threshold(lapAbs, thresh, params.threshold * 255, 255, cv.THRESH_BINARY);
+                
+                // Find contours
+                let contours = new cv.MatVector();
+                let hierarchy = new cv.Mat();
+                cv.findContours(thresh, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
+                
+                for (let i = 0; i < contours.size(); i++) {
+                    let cnt = contours.get(i);
+                    let area = cv.contourArea(cnt);
+                    if (area > 20 && area < 2000) {
+                        let moments = cv.moments(cnt);
+                        if (moments.m00 > 0) {
+                            let cx = moments.m10 / moments.m00;
+                            let cy = moments.m01 / moments.m00;
+                            let r = Math.sqrt(area / Math.PI);
+                            blobs.push({x: cx, y: cy, r: r, sigma: sigma, response: area});
+                        }
+                    }
+                }
+                
+                blurred.delete();
+                laplacian.delete();
+                lapAbs.delete();
+                thresh.delete();
+                contours.delete();
+                hierarchy.delete();
+            }
+            
+            return blobs;
+        }
+
+        // Create circular plate mask
+        function createPlateMask(grayImg) {
+            let mask = new cv.Mat.zeros(grayImg.rows, grayImg.cols, cv.CV_8UC1);
+            let center = new cv.Point(grayImg.cols / 2, grayImg.rows / 2);
+            let radius = Math.min(grayImg.cols, grayImg.rows) / 2 - 50;
+            cv.circle(mask, center, radius, new cv.Scalar(255), -1);
+            return mask;
+        }
+
+        // Non-maximum suppression for blobs
+        function nonMaxSuppression(blobs, distThresh) {
+            if (blobs.length === 0) return [];
+            
+            // Sort by response (area) descending
+            blobs.sort((a, b) => b.response - a.response);
+            
+            let keep = [];
+            for (let blob of blobs) {
+                let isDup = false;
+                for (let kept of keep) {
+                    let dx = blob.x - kept.x;
+                    let dy = blob.y - kept.y;
+                    let dist = Math.sqrt(dx*dx + dy*dy);
+                    if (dist < distThresh) {
+                        isDup = true;
+                        break;
+                    }
+                }
+                if (!isDup) {
+                    keep.push(blob);
+                }
+            }
+            
+            return keep;
+        }
+
+        // Verify blobs by intensity and contrast
+        function verifyBlobs(blobs, grayImg) {
+            let verified = [];
+            
+            for (let blob of blobs) {
+                let x = Math.round(blob.x);
+                let y = Math.round(blob.y);
+                let r = Math.max(1, Math.round(blob.r));
+                
+                // Check bounds
+                if (y - r < 0 || y + r >= grayImg.rows || x - r < 0 || x + r >= grayImg.cols) {
+                    continue;
+                }
+                
+                // Get ROI
+                let roi = grayImg.roi(new cv.Rect(x - r, y - r, 2*r, 2*r));
+                let roiData = roi.data;
+                
+                // Calculate center brightness
+                let centerSum = 0, centerCount = 0;
+                let edgeSum = 0, edgeCount = 0;
+                
+                for (let i = 0; i < roi.rows; i++) {
+                    for (let j = 0; j < roi.cols; j++) {
+                        let px = roi.ucharAt(i, j);
+                        let dx = j - r;
+                        let dy = i - r;
+                        let d = Math.sqrt(dx*dx + dy*dy);
+                        
+                        if (d < r * 0.5) {
+                            centerSum += px;
+                            centerCount++;
+                        } else if (d > r * 0.8) {
+                            edgeSum += px;
+                            edgeCount++;
+                        }
+                    }
+                }
+                
+                roi.delete();
+                
+                if (centerCount === 0 || edgeCount === 0) continue;
+                
+                let centerMean = centerSum / centerCount;
+                let edgeMean = edgeSum / edgeCount;
+                let contrast = centerMean - edgeMean;
+                
+                if (centerMean > params.intensity && contrast > params.contrast) {
+                    verified.push(blob);
+                }
+            }
+            
+            return verified;
+        }
+
+        // UI Helpers
+        function updateStep(text) {
+            document.getElementById('processStep').textContent = text;
+        }
+
+        function toggleParams() {
+            const section = document.getElementById('paramSection');
+            const arrow = document.getElementById('paramArrow');
+            section.classList.toggle('hidden');
+            arrow.classList.toggle('rotate-180');
+        }
+
+        function updateParam(name, value) {
+            params[name] = parseFloat(value);
+            document.getElementById(name + 'Val').textContent = value;
+        }
+
+        function reprocess() {
+            if (currentImage) {
+                processImage();
+            }
+        }
+
+        function resetAll() {
+            document.getElementById('uploadSection').classList.remove('hidden');
+            document.getElementById('processingStatus').classList.add('hidden');
+            document.getElementById('resultsSection').classList.add('hidden');
+            document.getElementById('fileInput').value = '';
+            document.getElementById('cameraInput').value = '';
+            currentImage = null;
+            if (currentResult) {
+                currentResult.delete();
+                currentResult = null;
+            }
+        }
+
+        function downloadResult() {
+            const canvas = document.getElementById('resultCanvas');
+            const link = document.createElement('a');
+            link.download = 'colony-count-' + new Date().getTime() + '.png';
+            link.href = canvas.toDataURL();
+            link.click();
+        }
+
+        // Initialize
+        window.onload = function() {
+            console.log('Colony Counter Ready');
+        };
+    </script>
+</body>
+</html>
