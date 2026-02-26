@@ -100,7 +100,7 @@
             border-radius: 20px; 
             overflow: auto;  /* 允许滚动查看放大区域 */
             box-shadow: 0 10px 40px rgba(0,0,0,0.4);
-            max-height: 70vh; /* 限制高度，避免溢出屏幕 */
+            max-height: 70vh;
         }
         .canvas-container { 
             position: relative; 
@@ -109,9 +109,10 @@
         }
         #mainCanvas { 
             display: block; 
-            width: auto;      /* 宽度由实际像素决定，通过JS设置style.width控制缩放 */
+            width: auto;      /* 宽度由JS动态设置像素值 */
             height: auto;
-            background: #1e293b; /* 占位背景 */
+            background: #1e293b;
+            max-width: none;  /* 确保滑块放大时不受限制 */
         }
         .overlay-layer { 
             position: absolute; 
@@ -133,7 +134,7 @@
             display: none; 
         }
         
-        /* 菌落标记 - 中心点缩小为5px */
+        /* 菌落标记 - 中心点缩小 */
         .colony-marker { 
             position: absolute; 
             transform: translate(-50%, -50%); 
@@ -143,10 +144,10 @@
             transition: all 0.2s; 
         }
         .marker-center { 
-            width: 5px;         /* 从8px改为5px */
+            width: 5px; 
             height: 5px; 
             background: #00ff88; 
-            border: 1px solid white; /* 边框变细 */
+            border: 1px solid white; 
             border-radius: 50%; 
             box-shadow: 0 1px 4px rgba(0,0,0,0.5); 
             position: absolute; 
@@ -243,7 +244,7 @@
             <h1>
                 <span>🔬</span>
                 <span>菌落计数器 Pro+</span>
-                <span class="version-badge">v4.1</span>
+                <span class="version-badge">v4.2</span>
             </h1>
         </header>
         
@@ -268,7 +269,7 @@
             
             <!-- 查看器 -->
             <div class="viewer" id="viewer">
-                <!-- 控制面板 - 增强版 -->
+                <!-- 控制面板 -->
                 <div class="control-panel">
                     <!-- 霍夫参数 -->
                     <div class="control-section">
@@ -300,7 +301,7 @@
                         </div>
                         <div class="slider-group">
                             <div class="slider-header"><span class="slider-label">高斯模糊半径</span><span class="slider-value" id="blurValue">3</span></div>
-                            <input type="range" id="blurRadius" min="1" max="9" value="3" step="2"> <!-- 奇数 -->
+                            <input type="range" id="blurRadius" min="1" max="9" value="3" step="2">
                         </div>
                         <div class="action-buttons">
                             <button class="btn btn-warning btn-small" id="selectRoiBtn">🎯 选择培养皿</button>
@@ -316,27 +317,27 @@
                             <div class="slider-header"><span class="slider-label">合并距离 (像素)</span><span class="slider-value" id="mergeDistValue">8</span></div>
                             <input type="range" id="mergeDist" min="2" max="20" value="8" step="1">
                         </div>
-                        <!-- 新增：缩放滑块 -->
+                        <!-- 缩放滑块 - 范围扩大至0.2~3.0 -->
                         <div class="slider-group">
                             <div class="slider-header"><span class="slider-label">图像缩放</span><span class="slider-value" id="zoomValue">1.0</span></div>
-                            <input type="range" id="zoomSlider" min="0.5" max="3.0" value="1.0" step="0.1">
+                            <input type="range" id="zoomSlider" min="0.2" max="3.0" value="1.0" step="0.1">
                         </div>
                         <div class="action-buttons">
                             <button class="btn btn-primary btn-small" id="analyzeBtn">🔄 重新分析</button>
                             <button class="btn btn-success btn-small" id="addModeBtn">➕ 手动添加</button>
                             <button class="btn btn-info btn-small" id="toggleCirclesBtn">⭕ 显隐圆圈</button>
-                            <button class="btn btn-secondary btn-small" id="resetParamsBtn">↺ 恢复默认</button> <!-- 新增 -->
+                            <button class="btn btn-secondary btn-small" id="resetParamsBtn">↺ 恢复默认</button>
                             <button class="btn btn-outline btn-small" id="exportImgBtn">📸 导出图片</button>
                             <button class="btn btn-danger btn-small" id="clearBtn">🗑️ 清空标记</button>
                             <button class="btn btn-outline btn-small" id="backBtn">↩️ 新图片</button>
                         </div>
                         <div class="algo-info" style="margin-top:8px">
-                            <strong>提示：</strong>先选ROI可屏蔽皿外干扰；缩放滑块可放大查看细节。
+                            <strong>提示：</strong>图片已自动适应屏幕，可滑动缩放查看细节。
                         </div>
                     </div>
                 </div>
                 
-                <!-- 图像显示区域 - 添加滚动支持 -->
+                <!-- 图像显示区域 -->
                 <div class="image-wrapper" id="imageWrapper">
                     <div class="canvas-container" id="canvasContainer">
                         <canvas id="mainCanvas"></canvas>
@@ -375,13 +376,13 @@
         let grayMat = null;
         let colonies = [];
         let isAddMode = false;
-        let showCircles = true;      // 控制圆圈显隐
+        let showCircles = true;
         
         // ROI相关
-        let roiCenter = null;      // {x, y} 原始图像坐标
-        let roiRadius = null;      // 像素
-        let isRoiMode = false;     // 是否正在绘制ROI
-        let roiStart = null;       // 触摸/鼠标按下时的原始坐标（圆心）
+        let roiCenter = null;
+        let roiRadius = null;
+        let isRoiMode = false;
+        let roiStart = null;
         
         // DOM 元素
         const uploadCard = document.getElementById('uploadCard');
@@ -392,7 +393,7 @@
         const roiVisual = document.getElementById('roiVisual');
         const imageWrapper = document.getElementById('imageWrapper');
         
-        // 默认参数值（用于恢复）
+        // 默认参数值
         const defaultParams = {
             param2: 16,
             minRadius: 3,
@@ -448,7 +449,6 @@
             document.getElementById('selectRoiBtn').addEventListener('click', enterRoiMode);
             document.getElementById('clearRoiBtn').addEventListener('click', clearRoi);
             document.getElementById('exportImgBtn').addEventListener('click', exportImage);
-            // 新增恢复默认按钮
             document.getElementById('resetParamsBtn').addEventListener('click', resetToDefault);
             
             // Canvas 交互 (鼠标+触摸)
@@ -489,30 +489,34 @@
             analyzeImage();
             uploadCard.style.display = 'none';
             viewer.classList.add('active');
-            // 应用初始缩放
-            applyZoom();
         }
         
         function displayImage(img) {
-            // 保持canvas像素为原图尺寸，确保清晰
+            // 保持canvas像素为原图尺寸
             canvas.width = img.width;
             canvas.height = img.height;
             ctx.drawImage(img, 0, 0);
             canvas.dataset.origWidth = img.width;
             canvas.dataset.origHeight = img.height;
-            // 缩放通过CSS控制，稍后在applyZoom中设置style.width
+            
+            // 计算适应屏幕的缩放值（容器宽度 / 图片宽度）
+            const containerWidth = imageWrapper.clientWidth;
+            let fitScale = containerWidth / img.width;
+            // 限制范围在0.2~3.0之间，但优先保证图片完整显示
+            fitScale = Math.min(3.0, Math.max(0.2, fitScale));
+            
+            // 设置缩放滑块的值并应用
+            const zoomSlider = document.getElementById('zoomSlider');
+            zoomSlider.value = fitScale.toFixed(1);
+            document.getElementById('zoomValue').textContent = fitScale.toFixed(1);
+            applyZoom();
         }
         
-        // 应用缩放滑块
+        // 应用缩放
         function applyZoom() {
             const zoom = parseFloat(document.getElementById('zoomSlider').value);
             canvas.style.width = (canvas.width * zoom) + 'px';
             canvas.style.height = (canvas.height * zoom) + 'px';
-            // 更新标记位置（因为overlayLayer依赖于canvas尺寸，但标记使用绝对定位，需要重新计算位置？）
-            // 标记的left/top是基于canvas的缩放尺寸的，但我们在渲染时已经乘以了canvas.dataset.scale，而scale = canvas.width / 原图宽度？ 
-            // 但我们现在直接用原始像素坐标乘以zoom? 注意：标记坐标是原始像素坐标，我们需要将它们转换为相对于canvas显示尺寸的位置。
-            // 之前的renderMarkers使用canvas.dataset.scale，但我们不再使用scale变量。需要重构renderMarkers。
-            // 解决方案：每次渲染标记时，根据当前zoom重新计算。
             renderMarkers();
         }
         
@@ -532,10 +536,22 @@
             document.getElementById('blurValue').textContent = defaultParams.blurRadius;
             document.getElementById('mergeDist').value = defaultParams.mergeDist;
             document.getElementById('mergeDistValue').textContent = defaultParams.mergeDist;
-            document.getElementById('zoomSlider').value = defaultParams.zoom;
-            document.getElementById('zoomValue').textContent = defaultParams.zoom.toFixed(1);
-            applyZoom();
-            analyzeImage(); // 重新分析
+            
+            // 重置缩放为适应屏幕的缩放
+            if (currentImage) {
+                const containerWidth = imageWrapper.clientWidth;
+                let fitScale = containerWidth / currentImage.width;
+                fitScale = Math.min(3.0, Math.max(0.2, fitScale));
+                document.getElementById('zoomSlider').value = fitScale.toFixed(1);
+                document.getElementById('zoomValue').textContent = fitScale.toFixed(1);
+                applyZoom();
+            } else {
+                document.getElementById('zoomSlider').value = defaultParams.zoom;
+                document.getElementById('zoomValue').textContent = defaultParams.zoom.toFixed(1);
+                applyZoom();
+            }
+            
+            analyzeImage();
         }
         
         // ---------- ROI 绘制逻辑 (支持触摸) ----------
@@ -568,7 +584,7 @@
             document.getElementById('roiIndicator').style.display = 'inline-flex';
         }
         
-        // 从鼠标/触摸事件获取原始图像坐标
+        // 从事件获取原始图像坐标
         function getImageCoordsFromEvent(e) {
             const rect = canvas.getBoundingClientRect();
             const zoom = parseFloat(document.getElementById('zoomSlider').value);
@@ -576,7 +592,7 @@
             if (e.touches) {
                 clientX = e.touches[0].clientX;
                 clientY = e.touches[0].clientY;
-                e.preventDefault(); // 阻止滚动
+                e.preventDefault();
             } else {
                 clientX = e.clientX;
                 clientY = e.clientY;
@@ -629,9 +645,8 @@
             canvas.style.cursor = 'default';
         }
         
-        // 触摸事件
         function handleTouchStart(e) {
-            e.preventDefault(); // 阻止滚动
+            e.preventDefault();
             if (!isRoiMode) return;
             const { x, y } = getImageCoordsFromEvent(e);
             roiStart = { x, y };
@@ -658,7 +673,6 @@
         function handleTouchEnd(e) {
             e.preventDefault();
             if (!isRoiMode || !roiStart) return;
-            // 使用最后一个触摸点
             const touch = e.changedTouches[0];
             const rect = canvas.getBoundingClientRect();
             const zoom = parseFloat(document.getElementById('zoomSlider').value);
@@ -696,7 +710,6 @@
             
             setTimeout(() => {
                 try {
-                    // 获取参数
                     const param2 = parseInt(document.getElementById('param2').value);
                     const minRadius = parseInt(document.getElementById('minRadius').value);
                     const maxRadius = parseInt(document.getElementById('maxRadius').value);
@@ -705,23 +718,16 @@
                     const blurRadius = parseInt(document.getElementById('blurRadius').value);
                     const mergeDist = parseInt(document.getElementById('mergeDist').value);
                     
-                    // 复制灰度图用于处理
                     let procMat = grayMat.clone();
-                    
-                    // 对比度亮度调整
                     procMat.convertTo(procMat, -1, contrast, brightness);
                     
-                    // 高斯模糊
                     let blurred = new cv.Mat();
                     let ksize = blurRadius;
-                    if (ksize % 2 === 0) ksize += 1; // 确保奇数
+                    if (ksize % 2 === 0) ksize += 1;
                     cv.GaussianBlur(procMat, blurred, new cv.Size(ksize, ksize), 0);
                     
-                    // Hough圆检测
                     let circles = new cv.Mat();
-                    cv.HoughCircles(
-                        blurred, circles, cv.HOUGH_GRADIENT, 1, 14, 45, param2, minRadius, maxRadius
-                    );
+                    cv.HoughCircles(blurred, circles, cv.HOUGH_GRADIENT, 1, 14, 45, param2, minRadius, maxRadius);
                     
                     let detected = [];
                     if (circles.cols > 0) {
@@ -730,7 +736,6 @@
                             const y = circles.data32F[i * 3 + 1];
                             const radius = circles.data32F[i * 3 + 2];
                             
-                            // 可选亮度验证 (保留原逻辑)
                             const x1 = Math.max(0, Math.floor(x - 3));
                             const y1 = Math.max(0, Math.floor(y - 3));
                             const x2 = Math.min(procMat.cols, Math.floor(x + 3));
@@ -739,7 +744,7 @@
                             let mean = cv.mean(roi);
                             roi.delete();
                             
-                            if (mean[0] > 60) {  // 亮度阈值
+                            if (mean[0] > 60) {
                                 detected.push({
                                     id: i,
                                     x: x,
@@ -766,7 +771,6 @@
                     
                     colonies = detected;
                     
-                    // 清理
                     procMat.delete();
                     blurred.delete();
                     circles.delete();
@@ -783,7 +787,6 @@
             }, 100);
         }
         
-        // 合并重叠圆 (保留半径大的)
         function mergeOverlappingCircles(circles, minDist) {
             if (circles.length < 2) return circles;
             let result = [];
@@ -797,7 +800,6 @@
                     const dy = current.y - circles[j].y;
                     const dist = Math.sqrt(dx*dx + dy*dy);
                     if (dist < minDist) {
-                        // 合并：保留半径大的
                         if (circles[j].radius > current.radius) {
                             current = circles[j];
                         }
@@ -810,7 +812,6 @@
             return result;
         }
         
-        // 渲染标记 - 根据当前zoom计算位置
         function renderMarkers() {
             overlayLayer.innerHTML = ''; 
             overlayLayer.appendChild(roiVisual);
@@ -822,7 +823,6 @@
                 marker.style.left = (colony.x * zoom) + 'px';
                 marker.style.top = (colony.y * zoom) + 'px';
                 
-                // 根据showCircles决定是否显示圆圈
                 if (showCircles) {
                     const circle = document.createElement('div');
                     circle.className = 'marker-circle';
@@ -847,7 +847,6 @@
                 
                 overlayLayer.appendChild(marker);
             });
-            // 更新ROI视觉
             if (roiCenter && roiRadius) updateRoiVisual();
         }
         
@@ -927,7 +926,6 @@
             canvas.style.cursor = 'default';
         }
         
-        // 导出带标记的图片
         function exportImage() {
             if (!currentImage) return;
             const exportCanvas = document.createElement('canvas');
@@ -935,7 +933,6 @@
             exportCanvas.height = currentImage.height;
             const eCtx = exportCanvas.getContext('2d');
             eCtx.drawImage(currentImage, 0, 0);
-            // 绘制标记
             eCtx.strokeStyle = '#00ff88';
             eCtx.fillStyle = '#00ff88';
             eCtx.lineWidth = 2;
@@ -962,6 +959,18 @@
             toast.classList.add('show');
             setTimeout(() => toast.classList.remove('show'), 3000);
         }
+        
+        // 窗口大小变化时重新适应（例如旋转屏幕）
+        window.addEventListener('resize', () => {
+            if (currentImage && viewer.classList.contains('active')) {
+                const containerWidth = imageWrapper.clientWidth;
+                let fitScale = containerWidth / currentImage.width;
+                fitScale = Math.min(3.0, Math.max(0.2, fitScale));
+                document.getElementById('zoomSlider').value = fitScale.toFixed(1);
+                document.getElementById('zoomValue').textContent = fitScale.toFixed(1);
+                applyZoom();
+            }
+        });
         
         // PWA
         if ('serviceWorker' in navigator) {
