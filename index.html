@@ -4,12 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="theme-color" content="#0f172a">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>菌落计数器 Hough Pro</title>
-    
-    <!-- OpenCV.js -->
-    <script async src="https://docs.opencv.org/4.8.0/opencv.js" onload="onOpenCvReady();"></script>
+    <title>菌落计数器 Hough Pro - 离线版</title>
     
     <style>
         :root {
@@ -87,6 +82,7 @@
             background: rgba(255,255,255,0.2);
             border-radius: 2px;
             overflow: hidden;
+            margin-bottom: 20px;
         }
         
         .loading-progress {
@@ -100,6 +96,20 @@
             0% { width: 0%; margin-left: 0%; }
             50% { width: 50%; margin-left: 25%; }
             100% { width: 0%; margin-left: 100%; }
+        }
+        
+        .retry-btn {
+            padding: 10px 20px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            display: none;
+        }
+        
+        .retry-btn.show {
+            display: block;
         }
         
         /* 主布局 */
@@ -618,9 +628,14 @@
     <div class="splash" id="splash">
         <div class="splash-icon">🔬</div>
         <div class="splash-text">菌落计数器 Hough Pro</div>
-        <div class="splash-subtitle">基于霍夫圆变换的精准识别</div>
-        <div class="loading-bar">
+        <div class="splash-subtitle" id="loadingText">正在加载 OpenCV.js...</div>
+        <div class="loading-bar" id="loadingBar">
             <div class="loading-progress"></div>
+        </div>
+        <button class="retry-btn" id="retryBtn" onclick="loadOpenCV()">重试加载</button>
+        <div style="margin-top: 20px; font-size: 0.8rem; color: var(--text-muted); max-width: 400px; text-align: center; padding: 0 20px;">
+            首次使用需要下载约 8MB 的 OpenCV 库<br>
+            请确保网络连接正常，或尝试切换网络
         </div>
     </div>
     
@@ -629,7 +644,7 @@
             <h1>
                 <span>🔬</span>
                 <span>菌落计数器 Hough Pro</span>
-                <span class="version-badge">v3.0</span>
+                <span class="version-badge">v3.1</span>
             </h1>
         </header>
         
@@ -789,9 +804,72 @@
     <!-- Toast -->
     <div class="toast" id="toast"></div>
 
+    <!-- OpenCV.js 加载 -->
     <script>
-        // 全局状态
+        // 尝试多个 CDN 源
+        const opencvUrls = [
+            'https://docs.opencv.org/4.8.0/opencv.js',
+            'https://cdn.jsdelivr.net/npm/opencv.js@1.2.1/opencv.js',
+            'https://unpkg.com/opencv.js@1.2.1/opencv.js'
+        ];
+        
         let cvReady = false;
+        let currentUrlIndex = 0;
+        
+        function loadOpenCV() {
+            document.getElementById('loadingText').textContent = '正在加载 OpenCV.js...';
+            document.getElementById('retryBtn').classList.remove('show');
+            document.getElementById('loadingBar').style.display = 'block';
+            
+            const script = document.createElement('script');
+            script.async = true;
+            script.src = opencvUrls[currentUrlIndex];
+            
+            script.onload = function() {
+                if (typeof cv !== 'undefined') {
+                    cvReady = true;
+                    document.querySelector('.splash-subtitle').textContent = 'OpenCV 加载完成';
+                    setTimeout(() => {
+                        document.getElementById('splash').classList.add('hidden');
+                    }, 800);
+                } else {
+                    tryNextUrl();
+                }
+            };
+            
+            script.onerror = function() {
+                tryNextUrl();
+            };
+            
+            // 10秒超时
+            setTimeout(() => {
+                if (!cvReady) {
+                    tryNextUrl();
+                }
+            }, 10000);
+            
+            document.head.appendChild(script);
+        }
+        
+        function tryNextUrl() {
+            currentUrlIndex++;
+            if (currentUrlIndex < opencvUrls.length) {
+                loadOpenCV();
+            } else {
+                // 所有源都失败
+                document.getElementById('loadingText').textContent = '加载失败，请检查网络连接';
+                document.getElementById('loadingBar').style.display = 'none';
+                document.getElementById('retryBtn').classList.add('show');
+                currentUrlIndex = 0; // 重置以便重试
+            }
+        }
+        
+        // 页面加载时自动开始加载 OpenCV
+        window.onload = function() {
+            loadOpenCV();
+        };
+        
+        // 全局状态
         let currentImage = null;
         let srcMat = null;
         let grayMat = null;
@@ -805,15 +883,6 @@
         const canvas = document.getElementById('mainCanvas');
         const ctx = canvas.getContext('2d');
         const overlayLayer = document.getElementById('overlayLayer');
-        
-        // OpenCV 就绪
-        function onOpenCvReady() {
-            cvReady = true;
-            document.querySelector('.splash-subtitle').textContent = 'OpenCV 加载完成';
-            setTimeout(() => {
-                document.getElementById('splash').classList.add('hidden');
-            }, 800);
-        }
         
         // 初始化
         document.addEventListener('DOMContentLoaded', () => {
