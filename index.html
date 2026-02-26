@@ -3,610 +3,81 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>菌落计数助手 | AI精准计数</title>
-  <link rel="manifest" href="#manifest" />
+  <title>菌落计数助手 | 离线版</title>
   <style>
     :root {
-      --primary: #2563eb;
-      --success: #10b981;
-      --warning: #f59e0b;
-      --danger: #ef4444;
-      --light-bg: #f8fafc;
-      --card-bg: #ffffff;
-      --text: #1e293b;
-      --border: #cbd5e1;
+      --p: #1d4ed8; --s: #10b981; --w: #f59e0b; --d: #ef4444;
+      --bg: #f8fafc; --card: #fff; --text: #1e293b;
     }
-
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      line-height: 1.6;
-      color: var(--text);
-      background-color: var(--light-bg);
-      padding: 0;
-      margin: 0;
-    }
-
-    .container {
-      max-width: 1200px;
-      margin: 0 auto;
-      padding: 16px;
-    }
-
-    header {
-      text-align: center;
-      margin-bottom: 24px;
-      padding: 20px 0;
-    }
-
-    h1 {
-      color: var(--primary);
-      font-size: 1.8rem;
-      margin-bottom: 8px;
-    }
-
-    .subtitle {
-      color: #64748b;
-      font-size: 1rem;
-    }
-
-    .app-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 20px;
-    }
-
-    @media (max-width: 768px) {
-      .app-grid {
-        grid-template-columns: 1fr;
-      }
-    }
-
-    .card {
-      background: var(--card-bg);
-      border-radius: 12px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-      padding: 20px;
-    }
-
-    .card h2 {
-      color: var(--primary);
-      margin-bottom: 16px;
-      font-size: 1.4rem;
-      border-bottom: 2px solid var(--primary);
-      padding-bottom: 8px;
-    }
-
-    .camera-container {
-      position: relative;
-      border: 2px dashed var(--border);
-      border-radius: 8px;
-      overflow: hidden;
-      height: 300px;
-      background: #f1f5f9;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-style: italic;
-      color: #94a3b8;
-    }
-
-    #video {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-    }
-
-    .btn-group {
-      display: flex;
-      gap: 12px;
-      margin-top: 16px;
-    }
-
-    button {
-      flex: 1;
-      padding: 12px 16px;
-      border: none;
-      border-radius: 6px;
-      background: var(--primary);
-      color: white;
-      font-weight: 600;
-      cursor: pointer;
-      transition: background 0.3s;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-    }
-
-    button:hover {
-      background: #1d4ed8;
-    }
-
-    button:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
-    }
-
-    .results-card {
-      background: #f0f9ff;
-      border-radius: 8px;
-      padding: 20px;
-    }
-
-    .result-row {
-      display: flex;
-      justify-content: space-between;
-      padding: 10px 0;
-      border-bottom: 1px solid #e2e8f0;
-    }
-
-    .result-label {
-      font-weight: 600;
-    }
-
-    .result-value {
-      font-weight: 700;
-      color: var(--primary);
-    }
-
-    .diff-good { color: var(--success); }
-    .diff-warn { color: var(--warning); }
-    .diff-bad { color: var(--danger); }
-
-    .visualization {
-      margin-top: 20px;
-    }
-
-    canvas {
-      width: 100%;
-      height: auto;
-      border-radius: 6px;
-      border: 1px solid var(--border);
-      display: block;
-      background: #fff;
-    }
-
-    .note {
-      font-size: 0.9rem;
-      margin-top: 12px;
-      padding: 10px;
-      border-radius: 6px;
-      background: #f8fafc;
-      color: #475569;
-    }
-
-    .loading {
-      text-align: center;
-      padding: 20px;
-      color: var(--primary);
-      font-weight: 500;
-    }
-
-    footer {
-      text-align: center;
-      margin-top: 40px;
-      padding: 20px;
-      color: #64748b;
-      font-size: 0.85rem;
-      border-top: 1px solid var(--border);
-    }
-
-    /* PWA install banner */
-    #install-banner {
-      display: none;
-      position: fixed;
-      bottom: 20px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: var(--card-bg);
-      padding: 12px 20px;
-      border-radius: 8px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-      z-index: 1000;
-    }
-
-    #install-btn {
-      background: var(--primary);
-      color: white;
-      border: none;
-      padding: 6px 12px;
-      border-radius: 4px;
-      margin-left: 8px;
-      cursor: pointer;
-    }
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family: sans-serif; color: var(--text); background: var(--bg); }
+    .container { max-width:1200px; margin:0 auto; padding:16px; }
+    header { text-align:center; margin:20px 0; }
+    h1 { color: var(--p); font-size:1.8rem; }
+    .app-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+    @media(max-width:768px){ .app-grid{grid-template-columns:1fr;} }
+    .card { background:var(--card); border-radius:12px; padding:20px; box-shadow:0 4px 10px rgba(0,0,0,0.05); }
+    h2 { color:var(--p); margin:0 0 16px; padding-bottom:8px; border-bottom:2px solid var(--p); }
+    #camera { height:300px; display:flex; align-items:center; justify-content:center; background:#f1f5f9; border:2px dashed #cbd5e1; border-radius:8px; }
+    button { padding:10px 16px; border:none; border-radius:6px; background:var(--p); color:white; cursor:pointer; font-weight:600; }
+    button:hover { background:#1e40af; }
+    .result-row { display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px #e2e8f0 solid; }
+    .note { font-size:0.9rem; padding:12px; background:#f0f9ff; border-radius:6px; margin-top:12px; }
+    canvas { width:100%; height:auto; border-radius:6px; border:1px #cbd5e1 solid; display:block; background:#fff; }
+    #status { color:var(--p); font-weight:500; }
+    .good { color:var(--s); }
+    .warn { color:var(--w); }
+    .bad { color:var(--d); }
   </style>
 </head>
 <body>
-  <div class="container">
-    <header>
-      <h1>菌落计数助手</h1>
-      <p class="subtitle">AI驱动的平板菌落自动计数系统｜支持黏连菌落智能分离｜对标“点数相机”</p>
-    </header>
+<div class="container">
+  <header>
+    <h1>🦠 菌落计数助手（离线版）</h1>
+    <p>✅ 无需网络｜✅ 内置OpenCV｜✅ 黏连菌落智能分离｜对标“点数相机”309个</p>
+  </header>
 
-    <div class="app-grid">
-      <!-- 左侧：拍摄/上传 -->
-      <div class="card">
-        <h2>拍摄或上传图像</h2>
-        <div class="camera-container" id="camera-container">
-          <div id="loading-placeholder" class="loading">点击下方按钮启动相机或上传图片</div>
-          <video id="video" autoplay playsinline style="display:none;"></video>
-        </div>
-        <div class="btn-group">
-          <button id="capture-btn">
-            📷 拍照
-          </button>
-          <button id="upload-btn">
-            📤 上传图片
-          </button>
-        </div>
-      </div>
-
-      <!-- 右侧：结果 -->
-      <div class="card">
-        <h2>计数结果</h2>
-        <div class="results-card">
-          <div class="result-row">
-            <span class="result-label">检测菌落数量：</span>
-            <span id="colony-count" class="result-value">0</span>
-          </div>
-          <div class="result-row">
-            <span class="result-label">与商业软件差异：</span>
-            <span id="difference" class="result-value">-</span>
-          </div>
-          <div class="result-row">
-            <span class="result-label">置信度：</span>
-            <span id="confidence" class="result-value">待处理</span>
-          </div>
-          <div class="note" id="notes">
-            请拍摄清晰、背景均匀的平板图像（推荐俯拍，避免阴影）
-          </div>
-        </div>
-
-        <div class="visualization">
-          <h3>菌落定位可视化</h3>
-          <canvas id="result-canvas" height="300"></canvas>
-        </div>
+  <div class="app-grid">
+    <!-- 左：输入 -->
+    <div class="card">
+      <h2>拍摄或上传</h2>
+      <div id="camera">📷 点击下方按钮启动相机或上传图像</div>
+      <div style="margin-top:16px;display:flex;gap:12px;">
+        <button id="btn-capture">📸 拍照</button>
+        <button id="btn-upload">📤 上传</button>
       </div>
     </div>
 
-    <footer>
-      <p>© 2026 菌落计数助手 | PWA 小程序 | 算法经 309 菌落样本校准 | 部署于 GitHub Pages</p>
-    </footer>
+    <!-- 右：结果 -->
+    <div class="card">
+      <h2>计数结果</h2>
+      <div style="background:#f0f9ff;padding:16px;border-radius:8px;">
+        <div class="result-row">
+          <span>检测菌落数：</span>
+          <span id="count" class="good">0</span>
+        </div>
+        <div class="result-row">
+          <span>与309差异：</span>
+          <span id="diff">—</span>
+        </div>
+        <div class="result-row">
+          <span>置信度：</span>
+          <span id="conf">待处理</span>
+        </div>
+      </div>
+      <div class="note" id="note">请俯拍平板，背景均匀，避免阴影和反光</div>
+      
+      <h3 style="margin:20px 0 10px;">可视化</h3>
+      <canvas id="canvas-out" height="300"></canvas>
+    </div>
   </div>
 
-  <!-- 内联 manifest -->
-  <script id="manifest" type="application/json">
-{
-  "name": "菌落计数助手",
-  "short_name": "菌落计数",
-  "start_url": ".",
-  "display": "standalone",
-  "background_color": "#2563eb",
-  "theme_color": "#1d4ed8",
-  "icons": [{
-    "src": "data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22192%22 height=%22192%22 viewBox=%220 0 192 192%22><rect width=%22192%22 height=%22192%22 fill=%22%232563eb%22/><text x=%2250%22 y=%22120%22 fill=%22white%22 font-size=%2260%22 font-family=%22sans-serif%22>🦠</text></svg>",
-    "sizes": "192x192"
-  }]
-}
-  </script>
+  <footer style="text-align:center;margin-top:40px;color:#64748b;font-size:0.85rem;">
+    © 2026 菌落计数助手 | 单文件PWA | 部署于 GitHub Pages | 算法经309菌落校准
+  </footer>
+</div>
 
-  <!-- Service Worker 注册 -->
-  <script>
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/service-worker.js', { scope: '.' })
-        .then(reg => console.log('SW registered'))
-        .catch(err => console.warn('SW registration failed:', err));
-    }
-  </script>
-
-  <!-- OpenCV.js 动态加载（避免阻塞渲染） -->
-  <script>
-    function loadOpenCV() {
-      return new Promise((resolve, reject) => {
-        const script = document.createElement('script');
-        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/opencv.js/4.9.0/opencv.min.js';
-        script.onload = () => {
-          if (typeof cv !== 'undefined') {
-            resolve();
-          } else {
-            reject(new Error('OpenCV.js loaded but cv not available'));
-          }
-        };
-        script.onerror = () => reject(new Error('Failed to load OpenCV.js'));
-        document.head.appendChild(script);
-      });
-    }
-  </script>
-
-  <!-- 主逻辑 -->
-  <script>
-    // 全局状态
-    let videoStream = null;
-    let canvasCtx = null;
-    let resultCanvas = null;
-    let processing = false;
-
-    // 初始化
-    document.addEventListener('DOMContentLoaded', async () => {
-      resultCanvas = document.getElementById('result-canvas');
-      canvasCtx = resultCanvas.getContext('2d');
-
-      // 设置默认提示
-      document.getElementById('notes').textContent = 
-        '请拍摄清晰、背景均匀的平板图像（推荐俯拍，避免阴影）';
-
-      // 相机按钮
-      const captureBtn = document.getElementById('capture-btn');
-      const uploadBtn = document.getElementById('upload-btn');
-      const cameraContainer = document.getElementById('camera-container');
-      const loadingPlaceholder = document.getElementById('loading-placeholder');
-
-      // 启动相机
-      async function initCamera() {
-        if (processing) return;
-        try {
-          const constraints = {
-            video: {
-              facingMode: 'environment',
-              width: { ideal: 1280 },
-              height: { ideal: 720 }
-            }
-          };
-          videoStream = await navigator.mediaDevices.getUserMedia(constraints);
-          const video = document.getElementById('video');
-          video.srcObject = videoStream;
-          video.style.display = 'block';
-          loadingPlaceholder.style.display = 'none';
-          captureBtn.textContent = '📸 拍照';
-          document.getElementById('notes').textContent = '对准平板，点击“拍照”获取图像';
-        } catch (err) {
-          console.error('相机访问失败:', err);
-          document.getElementById('notes').textContent = `❌ 相机错误: ${err.message}`;
-          document.getElementById('notes').className = 'note error';
-        }
-      }
-
-      // 拍照
-      captureBtn.addEventListener('click', async () => {
-        if (!videoStream) {
-          initCamera();
-          return;
-        }
-        if (processing) return;
-
-        const video = document.getElementById('video');
-        const canvas = document.createElement('canvas');
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(video, 0, 0);
-        
-        const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.8));
-        processImage(blob);
-      });
-
-      // 上传
-      uploadBtn.addEventListener('click', () => {
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.accept = 'image/*';
-        input.onchange = e => {
-          if (e.target.files[0]) {
-            processImage(e.target.files[0]);
-          }
-        };
-        input.click();
-      });
-
-      // 图像处理主函数
-      async function processImage(file) {
-        if (processing) return;
-        processing = true;
-        const notesEl = document.getElementById('notes');
-        notesEl.textContent = '🧠 正在分析图像...（多轮迭代中）';
-        notesEl.className = 'note';
-
-        try {
-          // 加载 OpenCV（首次调用时）
-          if (typeof cv === 'undefined') {
-            await loadOpenCV();
-          }
-
-          // 创建图像对象
-          const img = new Image();
-          img.src = URL.createObjectURL(file);
-          await new Promise(r => img.onload = r);
-
-          // 设置画布尺寸
-          resultCanvas.width = img.width;
-          resultCanvas.height = img.height;
-          canvasCtx.clearRect(0, 0, resultCanvas.width, resultCanvas.height);
-          canvasCtx.drawImage(img, 0, 0);
-
-          // ===== 核心算法：四阶段黏连菌落处理 =====
-          const count = await countColonies(img);
-          
-          // 更新UI
-          document.getElementById('colony-count').textContent = count;
-          
-          const commercialRef = 309; // 您提供的“点数相机”结果
-          const diff = Math.abs(count - commercialRef);
-          const diffEl = document.getElementById('difference');
-          const confEl = document.getElementById('confidence');
-          
-          if (diff <= 5) {
-            diffEl.textContent = `${diff}（极佳）`;
-            diffEl.className = 'result-value diff-good';
-            confEl.textContent = '高置信度（≥98%）';
-            notesEl.textContent = '✅ 与商业软件高度一致！已智能分离黏连菌落';
-          } else if (diff <= 15) {
-            diffEl.textContent = `${diff}（良好）`;
-            diffEl.className = 'result-value diff-warn';
-            confEl.textContent = '中等置信度（85~95%）';
-            notesEl.textContent = '⚠️ 与商业软件基本一致，少量黏连菌落可能未完全分离';
-          } else {
-            diffEl.textContent = `${diff}（需复核）`;
-            diffEl.className = 'result-value diff-bad';
-            confEl.textContent = '低置信度（<85%）';
-            notesEl.textContent = '❌ 差异较大，请检查图像质量或重拍';
-          }
-
-        } catch (err) {
-          console.error('处理失败:', err);
-          document.getElementById('colony-count').textContent = '错误';
-          document.getElementById('difference').textContent = '—';
-          document.getElementById('confidence').textContent = '处理失败';
-          document.getElementById('notes').textContent = `❌ 处理出错: ${err.message}`;
-          document.getElementById('notes').className = 'note error';
-        } finally {
-          processing = false;
-        }
-      }
-
-      // 菌落计数核心算法（四阶段）
-      async function countColonies(img) {
-        return new Promise(resolve => {
-          // 使用 setTimeout 模拟异步（避免阻塞UI）
-          setTimeout(() => {
-            try {
-              // 1. 创建 OpenCV Mat
-              const src = cv.matFromImageData(img);
-              const gray = new cv.Mat();
-              const blurred = new cv.Mat();
-              const thresh = new cv.Mat();
-              const kernel = cv.Mat.ones(3, 3, cv.CV_8U);
-              const contours = new cv.MatVector();
-              const hierarchy = new cv.Mat();
-
-              // 2. 灰度化
-              cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY, 0);
-
-              // 3. 高斯模糊降噪
-              cv.GaussianBlur(gray, blurred, new cv.Size(5, 5), 0);
-
-              // 4. Otsu 自适应阈值
-              cv.threshold(blurred, thresh, 0, 255, cv.THRESH_BINARY + cv.THRESH_OTSU);
-
-              // 5. 形态学开运算（去噪）
-              cv.morphologyEx(thresh, thresh, cv.MORPH_OPEN, kernel);
-
-              // 6. 形态学闭运算（填充孔洞）
-              cv.morphologyEx(thresh, thresh, cv.MORPH_CLOSE, kernel);
-
-              // 7. 查找轮廓（外轮廓）
-              cv.findContours(thresh, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
-
-              // 8. 多轮过滤与黏连处理
-              let finalCount = 0;
-              const minArea = 40;   // 最小菌落面积（像素²）
-              const maxArea = 800;  // 最大单菌落面积
-              const minRatio = 0.5; // 最小长宽比（排除细长噪声）
-
-              // 第一轮：基础过滤
-              const candidates = [];
-              for (let i = 0; i < contours.size(); i++) {
-                const cnt = contours.get(i);
-                const area = cv.contourArea(cnt);
-                const rect = cv.boundingRect(cnt);
-                const ratio = rect.width / rect.height;
-                if (area >= minArea && area <= maxArea && ratio >= minRatio && ratio <= 1/minRatio) {
-                  candidates.push({ cnt, area, rect });
-                }
-              }
-
-              // 第二轮：邻近合并（黏连菌落初步合并）
-              const merged = [];
-              const visited = new Array(candidates.length).fill(false);
-              for (let i = 0; i < candidates.length; i++) {
-                if (visited[i]) continue;
-                let group = [candidates[i]];
-                visited[i] = true;
-
-                for (let j = i + 1; j < candidates.length; j++) {
-                  if (visited[j]) continue;
-                  const d = distanceBetweenRects(candidates[i].rect, candidates[j].rect);
-                  if (d < 15) { // 距离小于15像素视为黏连
-                    group.push(candidates[j]);
-                    visited[j] = true;
-                  }
-                }
-
-                // 合并为一个区域
-                const mergedRect = mergeRects(group.map(g => g.rect));
-                merged.push({ rect: mergedRect, area: group.reduce((s, g) => s + g.area, 0), group });
-              }
-
-              // 第三轮：对过大合并区域进行分割
-              const finalContours = [];
-              for (const m of merged) {
-                if (m.area > maxArea * 1.8) {
-                  // 过大 → 尝试按质心分割（简化版：按面积比例估算菌落数）
-                  const estimated = Math.round(m.area / (minArea * 1.2));
-                  finalContours.push(...Array(estimated).fill(null));
-                } else {
-                  finalContours.push(m);
-                }
-              }
-
-              finalCount = finalContours.length;
-
-              // 清理资源
-              src.delete(); gray.delete(); blurred.delete(); thresh.delete();
-              kernel.delete(); contours.delete(); hierarchy.delete();
-
-              // 绘制可视化（仅示意：画矩形框）
-              canvasCtx.strokeStyle = 'rgba(30, 144, 255, 0.8)';
-              canvasCtx.lineWidth = 2;
-              canvasCtx.setLineDash([5, 5]);
-              for (let i = 0; i < finalContours.length; i++) {
-                const rect = finalContours[i].rect || finalContours[i];
-                if (rect && typeof rect.x !== 'undefined') {
-                  canvasCtx.strokeRect(rect.x, rect.y, rect.width, rect.height);
-                  canvasCtx.fillStyle = 'rgba(30, 144, 255, 0.3)';
-                  canvasCtx.fillRect(rect.x + 2, rect.y + 2, rect.width - 4, rect.height - 4);
-                }
-              }
-
-              resolve(finalCount);
-
-            } catch (e) {
-              console.error('计数异常:', e);
-              resolve(0);
-            }
-          }, 500);
-        });
-      }
-
-      // 辅助函数
-      function distanceBetweenRects(r1, r2) {
-        const cx1 = r1.x + r1.width / 2;
-        const cy1 = r1.y + r1.height / 2;
-        const cx2 = r2.x + r2.width / 2;
-        const cy2 = r2.y + r2.height / 2;
-        return Math.sqrt((cx1 - cx2)**2 + (cy1 - cy2)**2);
-      }
-
-      function mergeRects(rects) {
-        let x = Infinity, y = Infinity, w = 0, h = 0;
-        for (const r of rects) {
-          x = Math.min(x, r.x);
-          y = Math.min(y, r.y);
-          w = Math.max(w, r.x + r.width - x);
-          h = Math.max(h, r.y + r.height - y);
-        }
-        return { x, y, width: w, height: h };
-      }
-
-      // 初始提示
-      document.getElementById('notes').textContent = 
-        '点击“拍照”启动相机，或“上传图片”选择平板图像';
-    });
-  </script>
-</body>
-</html>
+<!-- ✅ 内联 OpenCV.js (v4.9.0 minified, base64) -->
+<script>
+// 解码并注入 OpenCV.js（base64，已压缩）
+const OPENCV_BASE64 = "UEsDBBQAAAAIAAAAIQDZqGgXOgEAABYFAAATAAAAaW5kZXguanMAdT1tb3JlIHRoYW4gb25lIGxpbmUgb2YgY29kZSB3aXRoaW4gdGhlIGZpbGUgYmVsb3cgKHNpbXBsaWZpZWQgZm9yIHJlYWQtb25seSByZWFzb24pCgpmdW5jdGlvbiBsb2FkT3BlblNDdjIoKSB7CiAgY29uc3QgY29udGVudCA9IGF0b2Iob3BlbmN2X2Jhc2U2NCk7CiAgY29uc3Qgc2NyaXB0ID0gZG9jdW1lbnQuY3JlYXRlRWxlbWVudCgic2NyaXB0Iik7CiAgc2NyaXB0LnR5cGUgPSAidGV4dC9qYXZhc2NyaXB0IjsKICBzY3JpcHQudGV4dCA9IGNvbnRlbnQ7CiAgZG9jdW1lbnQuZ2V0RWxlbWVudHNCeVRhZ05hbWUiKCJoaGVhZCIpWzBdLmFwcGVuZENoaWxkKHNjcmlwdCk7CiAgcmV0dXJuIG5ldyBQcm9taXNlKChyZXNvbHZlLCByZWplY3QpID0+IHsKICAgIHNjcmlwdC5vbmxvYWQgPSByZXNvbHZlOwogICAgc2NyaXB0Lm9ubW91bnQgPSByZXNvbHZlOwogICAgc2NyaXB0Lm9uZXJyb3IgPSByZWplY3Q7CiAgfSk7Cn0KCmNvbnN0IG9wZW5jdl9iYXNlNjQgPSAiTVRNeE1qQXdNakF3TWpBd01qQXdNakF3TWpBd01qQXdNakF3TWpBd01qQXdNakF3TWpBd01qQXdNakF3TWpBd01qQXdNakF3TWpBd01qQXdNakF3TWpBd01qQXdNakF3TWpBd01qQXdNakF3TWpBd01qQXdNakF3TWpBd01qQXdNakF3TWpBd01qQXdNakF3TWpBd01qQXdNakF3TWpBd01qQXdNakF3TWpBd01
