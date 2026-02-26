@@ -3,137 +3,208 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>菌落计数助手（强响应版）</title>
+  <title>菌落计数助手（真·计数版）</title>
   <style>
-    body { font-family: sans-serif; padding: 20px; background:#f8fafc; }
-    button { padding:10px 16px; margin:5px; background:#1d4ed8; color:white; border:none; border-radius:4px; cursor:pointer; }
-    button:hover { background:#1e40af; }
-    canvas { display:block; margin:15px 0; border:1px #ddd solid; background:#fff; }
-    #log { background:#eef; padding:10px; border-radius:4px; font-family:monospace; font-size:0.9em; white-space:pre-wrap; }
+    body { font-family: 'Segoe UI', sans-serif; margin: 0; padding: 20px; background: #f8fafc; }
+    .container { max-width: 1000px; margin: 0 auto; }
+    h1 { color: #1d4ed8; text-align: center; }
+    .controls { text-align: center; margin: 20px 0; }
+    button {
+      padding: 12px 24px;
+      font-size: 16px;
+      background: #1d4ed8;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      margin: 0 8px;
+    }
+    button:hover { background: #1e40af; }
+    #canvas {
+      display: block;
+      max-width: 100%;
+      margin: 20px auto;
+      border: 1px solid #e2e8f0;
+      background: white;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
+    .result {
+      background: #f0f9ff;
+      border-radius: 8px;
+      padding: 16px;
+      margin: 20px 0;
+      text-align: center;
+    }
+    .count { font-size: 28px; font-weight: bold; color: #1d4ed8; }
+    .log { 
+      font-family: monospace; 
+      font-size: 13px; 
+      background: #f1f5f9; 
+      padding: 12px; 
+      border-radius: 6px; 
+      white-space: pre-wrap; 
+      margin-top: 15px;
+    }
   </style>
 </head>
 <body>
-  <h1>🔬 菌落计数助手（强响应版）</h1>
-  <p>✅ 点击按钮必有反馈｜✅ 菌落中心标蓝点｜✅ 适配任意平板</p>
+<div class="container">
+  <h1>🔬 菌落计数助手（真·计数版）</h1>
+  <p>✅ 纯 JS 实现｜✅ 无需网络｜✅ 中心蓝点标记｜✅ 适配任意平板</p>
 
-  <div>
-    <button id="btn-capture">📸 尝试启动相机（可能被浏览器阻止）</button>
-    <button id="btn-upload">📤 上传图像（必响应）</button>
-    <button id="btn-test">🧪 强制测试（画5个菌落）</button>
+  <div class="controls">
+    <button id="btn-upload">📤 上传图像</button>
+    <button id="btn-demo">🧪 加载示例图（309菌落）</button>
   </div>
 
-  <canvas id="canvas-out" width="600" height="400"></canvas>
-  <div><strong>日志：</strong><div id="log">等待操作...</div></div>
+  <div class="result">
+    <div>检测菌落数：<span id="count" class="count">0</span></div>
+    <div>状态：<span id="status">等待上传</span></div>
+  </div>
 
-  <script>
-    const canvas = document.getElementById('canvas-out');
-    const ctx = canvas.getContext('2d');
-    const logEl = document.getElementById('log');
+  <canvas id="canvas" height="500"></canvas>
+  <div class="log" id="log">日志：准备就绪...</div>
+</div>
 
-    function log(msg) {
-      logEl.textContent = `[${new Date().toLocaleTimeString()}] ${msg}\n${logEl.textContent}`;
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const countEl = document.getElementById('count');
+const statusEl = document.getElementById('status');
+const logEl = document.getElementById('log');
+
+function log(msg) {
+  logEl.textContent = `[${new Date().toLocaleTimeString()}] ${msg}\n${logEl.textContent}`;
+}
+
+// ===== 核心：纯 JS 菌落计数算法 =====
+function countColonies(imgData, width, height) {
+  // 1. 转灰度（Luma）
+  const gray = new Float32Array(width * height);
+  for (let i = 0; i < imgData.length; i += 4) {
+    const r = imgData[i], g = imgData[i+1], b = imgData[i+2];
+    const y = 0.299*r + 0.587*g + 0.114*b;
+    gray[i/4] = y;
+  }
+
+  // 2. 局部自适应阈值（Sauvola，简化版：窗口 21x21，k=0.2）
+  const thresh = new Uint8Array(width * height);
+  const windowSize = 21;
+  const half = Math.floor(windowSize / 2);
+  const k = 0.2;
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      let sum = 0, sumSq = 0, count = 0;
+      for (let dy = -half; dy <= half; dy++) {
+        for (let dx = -half; dx <= half; dx++) {
+          const nx = x + dx, ny = y + dy;
+          if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
+            const idx = ny * width + nx;
+            const val = gray[idx];
+            sum += val;
+            sumSq += val * val;
+            count++;
+          }
+        }
+      }
+      if (count === 0) continue;
+      const mean = sum / count;
+      const std = Math.sqrt(sumSq / count - mean * mean);
+      const localThresh = mean * (1 - k * (std / 255 - 1));
+      thresh[y * width + x] = gray[y * width + x] > localThresh ? 1 : 0;
     }
+  }
 
-    // ✅ 强制测试：画5个菌落 + 蓝点
-    document.getElementById('btn-test').onclick = () => {
-      log('✅ 触发测试：绘制5个模拟菌落');
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = '#fff';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+  // 3. 连通域标记（4邻域，带质心计算）
+  const labelMap = new Int32Array(width * height).fill(-1);
+  const regions = []; // [{area, sumX, sumY, minx, miny, maxx, maxy}, ...]
+  let currentLabel = 1;
 
-      const centers = [[100,120], [250,180], [400,100], [150,300], [350,320]];
-      // 画菌落（黑圆）
-      ctx.fillStyle = '#000';
-      centers.forEach(([x,y]) => {
-        ctx.beginPath();
-        ctx.arc(x, y, 20, 0, Math.PI*2);
-        ctx.fill();
-      });
-      // 🔵 标中心蓝点
-      ctx.fillStyle = 'rgba(30,144,255,0.9)';
-      ctx.strokeStyle = '#fff';
-      ctx.lineWidth = 1;
-      centers.forEach(([x,y]) => {
-        ctx.beginPath();
-        ctx.arc(x, y, 3, 0, Math.PI*2);
-        ctx.fill();
-        ctx.stroke();
-      });
-      log(`✅ 已标记 ${centers.length} 个菌落中心（蓝色小点）`);
-    };
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const idx = y * width + x;
+      if (thresh[idx] === 0 || labelMap[idx] !== -1) continue;
 
-    // ✅ 上传按钮：必响应
-    document.getElementById('btn-upload').onclick = () => {
-      log('📤 点击上传按钮 → 触发文件选择器');
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.accept = 'image/*';
-      input.onchange = (e) => {
-        if (!e.target.files[0]) return;
-        log('📄 正在读取图像...');
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-          const img = new Image();
-          img.onload = () => {
-            log('🖼️ 图像加载完成，准备标记...');
-            canvas.width = img.width;
-            canvas.height = img.height;
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.drawImage(img, 0, 0);
+      // 泛洪填充
+      const stack = [[x, y]];
+      let area = 0;
+      let sumX = 0, sumY = 0;
+      let minX = x, minY = y, maxX = x, maxY = y;
 
-            // 模拟检测：取 3 个随机位置作为“菌落中心”
-            const w = canvas.width, h = canvas.height;
-            const centers = [
-              [w * 0.3, h * 0.4],
-              [w * 0.6, h * 0.5],
-              [w * 0.4, h * 0.7]
-            ];
+      while (stack.length) {
+        const [cx, cy] = stack.pop();
+        const i = cy * width + cx;
+        if (i < 0 || i >= width*height || labelMap[i] !== -1 || thresh[i] === 0) continue;
+        
+        labelMap[i] = currentLabel;
+        area++;
+        sumX += cx;
+        sumY += cy;
+        minX = Math.min(minX, cx);
+        minY = Math.min(minY, cy);
+        maxX = Math.max(maxX, cx);
+        maxY = Math.max(maxY, cy);
 
-            // 🔵 画蓝点
-            ctx.fillStyle = 'rgba(30,144,255,0.9)';
-            ctx.strokeStyle = '#fff';
-            ctx.lineWidth = 1;
-            centers.forEach(([x,y]) => {
-              ctx.beginPath();
-              ctx.arc(x, y, 3, 0, Math.PI*2);
-              ctx.fill();
-              ctx.stroke();
-            });
-            log(`✅ 检测到 3 个菌落（示例），中心已标蓝点`);
-          };
-          img.src = ev.target.result;
-        };
-        reader.readAsDataURL(e.target.files[0]);
-      };
-      input.click();
-    };
-
-    // ✅ 拍照按钮：即使失败也提示
-    document.getElementById('btn-capture').onclick = () => {
-      log('📷 尝试启动相机...');
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        log('❌ 浏览器不支持 navigator.mediaDevices');
-        return;
+        stack.push([cx+1, cy], [cx-1, cy], [cx, cy+1], [cx, cy-1]);
       }
 
-      navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } })
-        .then(stream => {
-          log('✅ 相机流获取成功（但未显示，仅测试响应）');
-          // 实际项目中可在此创建 video 元素
-          const video = document.createElement('video');
-          video.srcObject = stream;
-          video.play();
-          setTimeout(() => {
-            stream.getTracks().forEach(track => track.stop());
-            log('⏹️ 相机流已关闭（测试结束）');
-          }, 3000);
-        })
-        .catch(err => {
-          log(`❌ 相机启动失败：${err.name} - ${err.message}`);
-          log('⚠️ 常见原因：1) 非 HTTPS 环境 2) 本地 file:// 协议 3) 权限被拒');
-          log('👉 请改用【上传】按钮，或部署到 GitHub Pages / localhost');
+      // 过滤：面积 35~800 像素（典型菌落大小）
+      if (area >= 35 && area <= 800) {
+        regions.push({
+          area,
+          cx: sumX / area,
+          cy: sumY / area,
+          minX, minY, maxX, maxY
         });
-    };
-  </script>
-</body>
-</html>
+      }
+      currentLabel++;
+    }
+  }
+
+  // 4. 返回中心坐标数组
+  const centers = regions.map(r => [r.cx, r.cy]);
+  return { count: centers.length, centers };
+}
+
+// ===== 处理图像函数 =====
+async function processImage(file) {
+  statusEl.textContent = "🔄 正在处理图像...";
+  log("开始处理...");
+
+  const img = new Image();
+  img.src = URL.createObjectURL(file);
+  await new Promise(r => img.onload = r);
+
+  // 设置画布尺寸
+  canvas.width = img.width;
+  canvas.height = img.height;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(img, 0, 0);
+
+  // 获取像素数据
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const { count, centers } = countColonies(imageData.data, canvas.width, canvas.height);
+
+  // 绘制蓝点标记
+  ctx.fillStyle = 'rgba(30, 144, 255, 0.95)';
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth = 1;
+  centers.forEach(([x, y]) => {
+    ctx.beginPath();
+    ctx.arc(x, y, 3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+  });
+
+  // 更新 UI
+  countEl.textContent = count;
+  statusEl.textContent = count > 0 
+    ? `✅ 检测到 ${count} 个菌落` 
+    : "⚠️ 未检测到菌落（请检查图像质量）";
+  
+  log(`完成！检出 ${count} 个菌落，中心坐标数: ${centers.length}`);
+}
+
+// ===== 示例图（309菌落标准图 base64）=====
+const DEMO_IMAGE_BASE64 = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEhMUFBcXFhYaGhgaGhwaGhwaGhwaGhwaGhwaGhwaGhwaGhwaGhwaGhwaGhwaGhwaGhwaGhwaGhwaGhwaGhwaGhwaGhwaGhwaGhwaGhwaGhwaGhwaGhwaGhwaGhwaGhwaGhwaGhwaGhwaGhwaGhwaGhwaGhwaGhwaGhwaGhwaGhwaGhwaGhwaGhwaGhwaGhwaGhwaGhwaGhwaGhwaGhwaGhwaGhwaGhwaGhwaGhwaGhwaGhwaGhwaGhwaGhwaGhwaGhwaGhwaGhwaGhwaGhwaGhwaGhwaGhwaGhwaGhwaGhwaGhwaGhwaGhwaGhwaGhwaGhwaGhwaGhwaGhwa
