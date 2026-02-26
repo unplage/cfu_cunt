@@ -3,492 +3,1206 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>菌落计数器 Pro v1.0</title>
-    <script src="https://docs.opencv.org/4.8.0/opencv.js" async></script>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <meta name="theme-color" content="#0f172a">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>菌落计数器 Hough Pro</title>
+    
+    <!-- OpenCV.js -->
+    <script async src="https://docs.opencv.org/4.8.0/opencv.js" onload="onOpenCvReady();"></script>
+    
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
-        .canvas-container { position: relative; display: inline-block; }
-        #resultCanvas { max-width: 100%; height: auto; }
-        .loading { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
-        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
-        .param-slider { -webkit-appearance: none; appearance: none; height: 6px; background: #e5e7eb; border-radius: 5px; outline: none; }
-        .param-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 20px; height: 20px; background: #3b82f6; border-radius: 50%; cursor: pointer; }
+        :root {
+            --primary: #3b82f6;
+            --primary-dark: #1d4ed8;
+            --secondary: #64748b;
+            --success: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --info: #06b6d4;
+            --bg: #0f172a;
+            --card: #1e293b;
+            --text: #f1f5f9;
+            --text-muted: #94a3b8;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+        
+        /* 启动屏 */
+        .splash {
+            position: fixed;
+            inset: 0;
+            background: linear-gradient(135deg, #1e3a8a 0%, #0f172a 100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            transition: opacity 0.5s;
+        }
+        
+        .splash.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+        
+        .splash-icon {
+            font-size: 100px;
+            margin-bottom: 20px;
+            animation: bounce 2s infinite;
+        }
+        
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-20px); }
+        }
+        
+        .splash-text {
+            font-size: 1.8rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+        
+        .splash-subtitle {
+            color: var(--text-muted);
+            margin-bottom: 30px;
+        }
+        
+        .loading-bar {
+            width: 200px;
+            height: 4px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+        
+        .loading-progress {
+            height: 100%;
+            background: var(--primary);
+            width: 0%;
+            animation: loading 2s ease-in-out infinite;
+        }
+        
+        @keyframes loading {
+            0% { width: 0%; margin-left: 0%; }
+            50% { width: 50%; margin-left: 25%; }
+            100% { width: 0%; margin-left: 100%; }
+        }
+        
+        /* 主布局 */
+        .app {
+            max-width: 100vw;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        /* 头部 */
+        header {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 4px 20px rgba(59, 130, 246, 0.3);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        
+        h1 {
+            font-size: 1.6rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+        
+        .version-badge {
+            background: rgba(255,255,255,0.2);
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.7rem;
+        }
+        
+        /* 主内容 */
+        main {
+            flex: 1;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+            width: 100%;
+        }
+        
+        /* 上传卡片 */
+        .upload-card {
+            background: var(--card);
+            border-radius: 24px;
+            padding: 40px 30px;
+            text-align: center;
+            border: 2px dashed var(--secondary);
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+        
+        .upload-card:hover, .upload-card.active {
+            border-color: var(--primary);
+            background: rgba(59, 130, 246, 0.1);
+            transform: translateY(-2px);
+        }
+        
+        .upload-icon {
+            font-size: 72px;
+            margin-bottom: 20px;
+            opacity: 0.9;
+        }
+        
+        .upload-title {
+            font-size: 1.4rem;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+        
+        .upload-subtitle {
+            color: var(--text-muted);
+            margin-bottom: 30px;
+            font-size: 0.95rem;
+        }
+        
+        .upload-tips {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin-bottom: 25px;
+        }
+        
+        .tip-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            background: var(--bg);
+            padding: 6px 12px;
+            border-radius: 20px;
+        }
+        
+        .btn-group {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        
+        .btn {
+            padding: 14px 28px;
+            border: none;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: white;
+            box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(59, 130, 246, 0.5);
+        }
+        
+        .btn-secondary {
+            background: var(--secondary);
+            color: white;
+        }
+        
+        .btn-secondary:hover {
+            background: #475569;
+        }
+        
+        input[type="file"] {
+            display: none;
+        }
+        
+        /* 查看器 */
+        .viewer {
+            display: none;
+            flex-direction: column;
+            gap: 20px;
+            animation: fadeIn 0.5s;
+        }
+        
+        .viewer.active {
+            display: flex;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        /* 控制面板 */
+        .control-panel {
+            background: var(--card);
+            border-radius: 20px;
+            padding: 20px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+        }
+        
+        .control-section {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        
+        .section-title {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .slider-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        .slider-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .slider-label {
+            font-size: 0.9rem;
+        }
+        
+        .slider-value {
+            background: var(--bg);
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--primary);
+            min-width: 40px;
+            text-align: center;
+        }
+        
+        input[type="range"] {
+            width: 100%;
+            height: 6px;
+            -webkit-appearance: none;
+            background: var(--bg);
+            border-radius: 3px;
+            outline: none;
+        }
+        
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            background: var(--primary);
+            border-radius: 50%;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+        
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        
+        .btn-small {
+            padding: 10px 16px;
+            font-size: 0.85rem;
+        }
+        
+        .btn-success {
+            background: var(--success);
+            color: white;
+        }
+        
+        .btn-danger {
+            background: var(--danger);
+            color: white;
+        }
+        
+        .btn-warning {
+            background: var(--warning);
+            color: white;
+        }
+        
+        .btn-info {
+            background: var(--info);
+            color: white;
+        }
+        
+        .mode-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            background: rgba(59, 130, 246, 0.2);
+            color: var(--primary);
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+        
+        .mode-indicator.manual {
+            background: rgba(16, 185, 129, 0.2);
+            color: var(--success);
+        }
+        
+        /* 图像容器 */
+        .image-wrapper {
+            position: relative;
+            background: var(--card);
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.4);
+        }
+        
+        .canvas-container {
+            position: relative;
+            display: inline-block;
+            width: 100%;
+        }
+        
+        #mainCanvas {
+            display: block;
+            width: 100%;
+            height: auto;
+        }
+        
+        .overlay-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+        
+        .colony-marker {
+            position: absolute;
+            transform: translate(-50%, -50%);
+            pointer-events: auto;
+            cursor: pointer;
+            z-index: 10;
+            transition: all 0.2s;
+        }
+        
+        .marker-center {
+            width: 8px;
+            height: 8px;
+            background: #00ff88;
+            border: 2px solid white;
+            border-radius: 50%;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+        
+        .marker-circle {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            border: 2px solid #ff4757;
+            border-radius: 50%;
+            opacity: 0.8;
+        }
+        
+        .colony-marker:hover {
+            z-index: 20;
+            transform: translate(-50%, -50%) scale(1.2);
+        }
+        
+        .colony-marker:hover .marker-center {
+            background: #ff4757;
+        }
+        
+        .colony-marker.manual .marker-center {
+            background: #ffd700;
+        }
+        
+        .colony-marker.manual .marker-circle {
+            border-color: #ffd700;
+        }
+        
+        .marker-tooltip {
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.9);
+            color: white;
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            white-space: nowrap;
+            opacity: 0;
+            transition: opacity 0.2s;
+            pointer-events: none;
+            margin-bottom: 5px;
+            z-index: 30;
+        }
+        
+        .colony-marker:hover .marker-tooltip {
+            opacity: 1;
+        }
+        
+        /* 统计面板 */
+        .stats-panel {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 15px;
+        }
+        
+        .stat-box {
+            background: var(--card);
+            border-radius: 16px;
+            padding: 20px;
+            text-align: center;
+            border: 1px solid rgba(255,255,255,0.1);
+            transition: transform 0.2s;
+        }
+        
+        .stat-box:hover {
+            transform: translateY(-2px);
+            border-color: var(--primary);
+        }
+        
+        .stat-number {
+            font-size: 2.2rem;
+            font-weight: 700;
+            color: var(--primary);
+            display: block;
+            line-height: 1;
+        }
+        
+        .stat-label {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-top: 8px;
+        }
+        
+        .stat-box.success .stat-number { color: var(--success); }
+        .stat-box.warning .stat-number { color: var(--warning); }
+        .stat-box.info .stat-number { color: var(--info); }
+        
+        /* 加载遮罩 */
+        .loading-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(10px);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            z-index: 9998;
+        }
+        
+        .loading-overlay.active {
+            display: flex;
+        }
+        
+        .spinner {
+            width: 60px;
+            height: 60px;
+            border: 4px solid rgba(59, 130, 246, 0.2);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .loading-text {
+            margin-top: 20px;
+            font-size: 1.1rem;
+            color: var(--text);
+        }
+        
+        .loading-subtext {
+            margin-top: 10px;
+            font-size: 0.9rem;
+            color: var(--text-muted);
+        }
+        
+        /* Toast */
+        .toast {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background: var(--card);
+            color: var(--text);
+            padding: 16px 24px;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.4);
+            border: 1px solid rgba(255,255,255,0.1);
+            opacity: 0;
+            transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+            z-index: 10000;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 500;
+        }
+        
+        .toast.show {
+            transform: translateX(-50%) translateY(0);
+            opacity: 1;
+        }
+        
+        /* 算法说明 */
+        .algo-info {
+            background: rgba(59, 130, 246, 0.1);
+            border-left: 4px solid var(--primary);
+            padding: 12px 16px;
+            border-radius: 0 8px 8px 0;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+        
+        /* 响应式 */
+        @media (max-width: 768px) {
+            h1 { font-size: 1.3rem; }
+            .upload-title { font-size: 1.2rem; }
+            .control-panel { grid-template-columns: 1fr; }
+            .stats-panel { grid-template-columns: repeat(2, 1fr); }
+        }
     </style>
-<base target="_blank">
 </head>
-<body class="bg-gray-50 min-h-screen">
-
-    <!-- Header -->
-    <header class="bg-blue-600 text-white p-4 shadow-lg sticky top-0 z-50">
-        <div class="flex items-center justify-between max-w-4xl mx-auto">
-            <h1 class="text-xl font-bold flex items-center gap-2">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                菌落计数器 Pro v1.0
+<body>
+    <!-- 启动屏 -->
+    <div class="splash" id="splash">
+        <div class="splash-icon">🔬</div>
+        <div class="splash-text">菌落计数器 Hough Pro</div>
+        <div class="splash-subtitle">基于霍夫圆变换的精准识别</div>
+        <div class="loading-bar">
+            <div class="loading-progress"></div>
+        </div>
+    </div>
+    
+    <div class="app">
+        <header>
+            <h1>
+                <span>🔬</span>
+                <span>菌落计数器 Hough Pro</span>
+                <span class="version-badge">v3.0</span>
             </h1>
-            <span class="text-xs bg-blue-800 px-2 py-1 rounded">优化版</span>
-        </div>
-    </header>
-
-    <main class="max-w-4xl mx-auto p-4 space-y-4">
-
-        <!-- Upload Section -->
-        <div class="bg-white rounded-xl shadow-md p-6 text-center" id="uploadSection">
-            <div class="border-4 border-dashed border-gray-300 rounded-lg p-8 hover:border-blue-400 transition-colors cursor-pointer" onclick="document.getElementById('fileInput').click()">
-                <svg class="w-16 h-16 mx-auto text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-                <p class="text-gray-600 mb-2">点击上传或拍照</p>
-                <p class="text-sm text-gray-400">支持 JPG, PNG 格式</p>
-            </div>
-            <input type="file" id="fileInput" accept="image/*" class="hidden" onchange="handleImage(event)">
-            
-            <button onclick="openCamera()" class="mt-4 w-full bg-green-500 text-white py-3 rounded-lg font-semibold hover:bg-green-600 transition flex items-center justify-center gap-2">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path></svg>
-                打开相机拍照
-            </button>
-            <input type="file" id="cameraInput" accept="image/*" capture="environment" class="hidden" onchange="handleImage(event)">
-        </div>
-
-        <!-- Processing Status -->
-        <div id="processingStatus" class="hidden bg-blue-50 border border-blue-200 rounded-xl p-6 text-center">
-            <div class="loading inline-block w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mb-3"></div>
-            <p class="text-blue-800 font-semibold">正在分析菌落...</p>
-            <p class="text-sm text-blue-600 mt-1" id="processStep">初始化 OpenCV...</p>
-        </div>
-
-        <!-- Results Section -->
-        <div id="resultsSection" class="hidden space-y-4">
-            
-            <!-- Count Display -->
-            <div class="bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl shadow-lg p-6 text-white text-center">
-                <p class="text-blue-100 text-sm uppercase tracking-wide mb-1">检测到的菌落数</p>
-                <p class="text-5xl font-bold" id="colonyCount">0</p>
-                <p class="text-blue-200 text-sm mt-2">CFU (Colony Forming Units)</p>
-            </div>
-
-            <!-- Image Display -->
-            <div class="bg-white rounded-xl shadow-md p-4">
-                <div class="flex justify-between items-center mb-3">
-                    <h3 class="font-semibold text-gray-800">检测结果</h3>
-                    <button onclick="downloadResult()" class="text-sm bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded transition">
-                        保存图片
-                    </button>
-                </div>
-                <div class="canvas-container w-full overflow-x-auto">
-                    <canvas id="resultCanvas"></canvas>
-                </div>
-            </div>
-
-            <!-- Statistics -->
-            <div class="bg-white rounded-xl shadow-md p-4">
-                <h3 class="font-semibold text-gray-800 mb-3">统计信息</h3>
-                <div class="grid grid-cols-2 gap-4 text-sm">
-                    <div class="bg-gray-50 p-3 rounded">
-                        <span class="text-gray-500">平均半径</span>
-                        <p class="font-semibold text-lg" id="avgRadius">- px</p>
+        </header>
+        
+        <main>
+            <!-- 上传区域 -->
+            <div class="upload-card" id="uploadCard">
+                <div class="upload-icon">📤</div>
+                <div class="upload-title">拖放图片或点击上传</div>
+                <div class="upload-subtitle">支持 JPG、PNG、WEBP 格式</div>
+                
+                <div class="upload-tips">
+                    <div class="tip-item">
+                        <span>⚫</span>
+                        <span>黑色背景效果最佳</span>
                     </div>
-                    <div class="bg-gray-50 p-3 rounded">
-                        <span class="text-gray-500">检测区域</span>
-                        <p class="font-semibold text-lg" id="plateArea">- %</p>
+                    <div class="tip-item">
+                        <span>💡</span>
+                        <span>光线均匀避免反光</span>
                     </div>
-                    <div class="bg-gray-50 p-3 rounded">
-                        <span class="text-gray-500">中心区域</span>
-                        <p class="font-semibold text-lg" id="centerCount">-</p>
+                    <div class="tip-item">
+                        <span>🔍</span>
+                        <span>菌落清晰可见</span>
                     </div>
-                    <div class="bg-gray-50 p-3 rounded">
-                        <span class="text-gray-500">边缘区域</span>
-                        <p class="font-semibold text-lg" id="edgeCount">-</p>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Advanced Parameters -->
-            <div class="bg-white rounded-xl shadow-md p-4">
-                <div class="flex justify-between items-center mb-4 cursor-pointer" onclick="toggleParams()">
-                    <h3 class="font-semibold text-gray-800">算法参数（已优化）</h3>
-                    <svg id="paramArrow" class="w-5 h-5 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
                 </div>
                 
-                <div id="paramSection" class="hidden space-y-4 text-sm text-gray-600">
-                    <div class="bg-yellow-50 p-3 rounded border border-yellow-200">
-                        <p class="font-semibold text-yellow-800 mb-1">当前参数（715 CFU优化版）</p>
-                        <ul class="list-disc list-inside space-y-1 text-yellow-700">
-                            <li>分水岭最小距离: 10px</li>
-                            <li>最小菌落面积: 35px²</li>
-                            <li>最大菌落面积: 1000px²</li>
-                            <li>NMS距离: 12px</li>
-                            <li>圆度阈值: 0.35</li>
-                            <li>凸度阈值: 0.65</li>
-                            <li>亮度阈值: 85</li>
-                            <li>边缘安全边距: 25px</li>
-                        </ul>
+                <div class="btn-group">
+                    <button class="btn btn-primary" onclick="document.getElementById('fileInput').click()">
+                        <span>📁</span>
+                        <span>选择文件</span>
+                    </button>
+                    <button class="btn btn-secondary" onclick="document.getElementById('cameraInput').click()">
+                        <span>📷</span>
+                        <span>立即拍照</span>
+                    </button>
+                </div>
+                <input type="file" id="fileInput" accept="image/*">
+                <input type="file" id="cameraInput" accept="image/*" capture="environment">
+            </div>
+            
+            <!-- 查看器 -->
+            <div class="viewer" id="viewer">
+                <!-- 控制面板 -->
+                <div class="control-panel">
+                    <div class="control-section">
+                        <div class="section-title">⚙️ Hough圆检测参数</div>
+                        
+                        <div class="algo-info">
+                            <strong>算法原理：</strong>霍夫圆变换检测圆形菌落，通过累加器阈值(param2)控制灵敏度
+                        </div>
+                        
+                        <div class="slider-group" style="margin-top: 12px;">
+                            <div class="slider-header">
+                                <span class="slider-label">累加器阈值 (param2)</span>
+                                <span class="slider-value" id="param2Value">16</span>
+                            </div>
+                            <input type="range" id="param2" min="10" max="30" value="16" step="1">
+                            <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">
+                                <span>更多菌落</span>
+                                <span>更精准</span>
+                            </div>
+                        </div>
+                        
+                        <div class="slider-group">
+                            <div class="slider-header">
+                                <span class="slider-label">亮度阈值</span>
+                                <span class="slider-value" id="brightnessValue">170</span>
+                            </div>
+                            <input type="range" id="brightnessThreshold" min="120" max="220" value="170">
+                            <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">
+                                <span>检测暗菌落</span>
+                                <span>只检测亮菌落</span>
+                            </div>
+                        </div>
+                        
+                        <div class="slider-group">
+                            <div class="slider-header">
+                                <span class="slider-label">最小半径</span>
+                                <span class="slider-value" id="minRadiusValue">3</span>
+                            </div>
+                            <input type="range" id="minRadius" min="2" max="10" value="3">
+                        </div>
+                        
+                        <div class="slider-group">
+                            <div class="slider-header">
+                                <span class="slider-label">最大半径</span>
+                                <span class="slider-value" id="maxRadiusValue">22</span>
+                            </div>
+                            <input type="range" id="maxRadius" min="15" max="40" value="22">
+                        </div>
                     </div>
-                    <p class="text-xs text-gray-500">这些参数经过多轮验证，平衡了准确性和召回率。</p>
+                    
+                    <div class="control-section">
+                        <div class="section-title">🎯 操作模式</div>
+                        <div class="mode-indicator" id="modeIndicator">
+                            <span>🔍</span>
+                            <span>Hough圆检测模式</span>
+                        </div>
+                        <div class="action-buttons">
+                            <button class="btn btn-primary btn-small" id="analyzeBtn">🔄 重新分析</button>
+                            <button class="btn btn-success btn-small" id="addModeBtn">➕ 手动添加</button>
+                            <button class="btn btn-warning btn-small" id="toggleCirclesBtn">⭕ 显示/隐藏圆圈</button>
+                        </div>
+                    </div>
+                    
+                    <div class="control-section">
+                        <div class="section-title">⚡ 快捷操作</div>
+                        <div class="action-buttons">
+                            <button class="btn btn-info btn-small" id="exportBtn">💾 导出结果</button>
+                            <button class="btn btn-danger btn-small" id="clearBtn">🗑️ 清空</button>
+                            <button class="btn btn-secondary btn-small" id="backBtn">↩️ 新图片</button>
+                        </div>
+                        
+                        <div class="algo-info" style="margin-top: 12px;">
+                            <strong>提示：</strong>param2值越小检测越多圆（15-18最佳），亮度阈值过滤非白色杂质
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 图像显示 -->
+                <div class="image-wrapper">
+                    <div class="canvas-container" id="canvasContainer">
+                        <canvas id="mainCanvas"></canvas>
+                        <div class="overlay-layer" id="overlayLayer"></div>
+                    </div>
+                </div>
+                
+                <!-- 统计面板 -->
+                <div class="stats-panel">
+                    <div class="stat-box">
+                        <span class="stat-number" id="statTotal">0</span>
+                        <div class="stat-label">总菌落数</div>
+                    </div>
+                    <div class="stat-box success">
+                        <span class="stat-number" id="statAuto">0</span>
+                        <div class="stat-label">Hough检测</div>
+                    </div>
+                    <div class="stat-box warning">
+                        <span class="stat-number" id="statManual">0</span>
+                        <div class="stat-label">手动添加</div>
+                    </div>
+                    <div class="stat-box info">
+                        <span class="stat-number" id="statAvgRadius">0</span>
+                        <div class="stat-label">平均半径(px)</div>
+                    </div>
                 </div>
             </div>
-
-            <!-- New Analysis -->
-            <button onclick="resetAll()" class="w-full bg-gray-200 text-gray-800 py-3 rounded-lg font-semibold hover:bg-gray-300 transition">
-                分析新图片
-            </button>
-        </div>
-
-        <!-- Instructions -->
-        <div class="bg-yellow-50 border border-yellow-200 rounded-xl p-4 text-sm text-yellow-800">
-            <h4 class="font-semibold mb-2 flex items-center gap-2">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                使用提示
-            </h4>
-            <ul class="list-disc list-inside space-y-1 text-yellow-700">
-                <li>确保培养皿在照片中居中且清晰可见</li>
-                <li>光线均匀，避免强烈阴影或反光</li>
-                <li>算法会自动排除平板边缘的折射假阳性</li>
-                <li>首次加载可能需要10-20秒初始化OpenCV</li>
-                <li>结果包含中心区域（绿色）和边缘区域（橙色）</li>
-            </ul>
-        </div>
-
-    </main>
+        </main>
+    </div>
+    
+    <!-- 加载遮罩 -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="spinner"></div>
+        <div class="loading-text">Hough圆变换分析中...</div>
+        <div class="loading-subtext">霍夫空间累加计算</div>
+    </div>
+    
+    <!-- Toast -->
+    <div class="toast" id="toast"></div>
 
     <script>
-        // Global variables
+        // 全局状态
         let cvReady = false;
         let currentImage = null;
-        let currentResult = null;
-        let finalColonies = [];
+        let srcMat = null;
+        let grayMat = null;
+        let colonies = [];
+        let isAddMode = false;
+        let showCircles = true;
         
-        // Optimized parameters (715 CFU version)
-        const params = {
-            watershedMinDistance: 10,
-            minArea: 35,
-            maxArea: 1000,
-            nmsDistance: 12,
-            minCircularity: 0.35,
-            minSolidity: 0.65,
-            minIntensity: 85,
-            edgeMargin: 25
-        };
-
-        // Wait for OpenCV
+        // DOM 元素
+        const uploadCard = document.getElementById('uploadCard');
+        const viewer = document.getElementById('viewer');
+        const canvas = document.getElementById('mainCanvas');
+        const ctx = canvas.getContext('2d');
+        const overlayLayer = document.getElementById('overlayLayer');
+        
+        // OpenCV 就绪
         function onOpenCvReady() {
             cvReady = true;
-            console.log('OpenCV.js is ready');
+            document.querySelector('.splash-subtitle').textContent = 'OpenCV 加载完成';
+            setTimeout(() => {
+                document.getElementById('splash').classList.add('hidden');
+            }, 800);
         }
-
-        setInterval(() => {
-            if (typeof cv !== 'undefined' && !cvReady) {
-                onOpenCvReady();
+        
+        // 初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            // 文件处理
+            document.getElementById('fileInput').addEventListener('change', handleFile);
+            document.getElementById('cameraInput').addEventListener('change', handleFile);
+            
+            // 拖拽支持
+            uploadCard.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                uploadCard.classList.add('active');
+            });
+            uploadCard.addEventListener('dragleave', () => {
+                uploadCard.classList.remove('active');
+            });
+            uploadCard.addEventListener('drop', (e) => {
+                e.preventDefault();
+                uploadCard.classList.remove('active');
+                if (e.dataTransfer.files.length) processFile(e.dataTransfer.files[0]);
+            });
+            
+            // 滑块事件
+            document.getElementById('param2').addEventListener('input', (e) => {
+                document.getElementById('param2Value').textContent = e.target.value;
+            });
+            document.getElementById('brightnessThreshold').addEventListener('input', (e) => {
+                document.getElementById('brightnessValue').textContent = e.target.value;
+            });
+            document.getElementById('minRadius').addEventListener('input', (e) => {
+                document.getElementById('minRadiusValue').textContent = e.target.value;
+            });
+            document.getElementById('maxRadius').addEventListener('input', (e) => {
+                document.getElementById('maxRadiusValue').textContent = e.target.value;
+            });
+            
+            // 按钮事件
+            document.getElementById('analyzeBtn').addEventListener('click', analyzeImage);
+            document.getElementById('addModeBtn').addEventListener('click', toggleAddMode);
+            document.getElementById('toggleCirclesBtn').addEventListener('click', toggleCircles);
+            document.getElementById('clearBtn').addEventListener('click', clearAll);
+            document.getElementById('backBtn').addEventListener('click', resetApp);
+            document.getElementById('exportBtn').addEventListener('click', exportResults);
+            
+            // Canvas 交互
+            canvas.addEventListener('click', handleCanvasClick);
+        });
+        
+        function handleFile(e) {
+            if (e.target.files.length) processFile(e.target.files[0]);
+        }
+        
+        function processFile(file) {
+            if (!file.type.startsWith('image/')) {
+                showToast('❌ 请选择有效的图片文件');
+                return;
             }
-        }, 1000);
-
-        function openCamera() {
-            document.getElementById('cameraInput').click();
-        }
-
-        function handleImage(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-
+            
             const reader = new FileReader();
-            reader.onload = function(e) {
+            reader.onload = (e) => {
                 const img = new Image();
-                img.onload = function() {
+                img.onload = () => {
                     currentImage = img;
-                    processImage();
+                    initOpenCV(img);
                 };
                 img.src = e.target.result;
             };
             reader.readAsDataURL(file);
         }
-
-        async function processImage() {
+        
+        function initOpenCV(img) {
             if (!cvReady) {
-                alert('OpenCV正在初始化，请稍后再试...');
+                showToast('⏳ OpenCV 加载中，请稍候...');
+                setTimeout(() => initOpenCV(img), 1000);
                 return;
             }
-
-            if (!currentImage) return;
-
-            document.getElementById('uploadSection').classList.add('hidden');
-            document.getElementById('processingStatus').classList.remove('hidden');
-            document.getElementById('resultsSection').classList.add('hidden');
-
+            
+            // 释放之前的 Mat
+            if (srcMat) srcMat.delete();
+            if (grayMat) grayMat.delete();
+            
+            // 创建 Mat
+            srcMat = cv.imread(img);
+            grayMat = new cv.Mat();
+            cv.cvtColor(srcMat, grayMat, cv.COLOR_RGBA2GRAY);
+            
+            // 显示图像
+            displayImage(img);
+            
+            // 自动分析
+            analyzeImage();
+            
+            // 切换视图
+            uploadCard.style.display = 'none';
+            viewer.classList.add('active');
+        }
+        
+        function displayImage(img) {
+            const maxWidth = Math.min(window.innerWidth - 40, 900);
+            const scale = Math.min(maxWidth / img.width, 1);
+            
+            canvas.width = img.width * scale;
+            canvas.height = img.height * scale;
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            
+            canvas.dataset.scale = scale;
+            canvas.dataset.origWidth = img.width;
+            canvas.dataset.origHeight = img.height;
+        }
+        
+        function analyzeImage() {
+            if (!grayMat || !cvReady) return;
+            
+            document.getElementById('loadingOverlay').classList.add('active');
+            
             setTimeout(() => {
                 try {
-                    performDetection();
-                } catch (error) {
-                    console.error(error);
-                    alert('处理出错: ' + error.message);
-                    resetAll();
-                }
-            }, 100);
-        }
-
-        function updateStep(text) {
-            document.getElementById('processStep').textContent = text;
-        }
-
-        function performDetection() {
-            updateStep('读取图像...');
-            
-            // Read image
-            let src = cv.imread(currentImage);
-            
-            // Resize if too large
-            const maxDim = 1280;
-            let scale = 1;
-            if (Math.max(src.cols, src.rows) > maxDim) {
-                scale = maxDim / Math.max(src.cols, src.rows);
-                let dsize = new cv.Size(Math.round(src.cols * scale), Math.round(src.rows * scale));
-                cv.resize(src, src, dsize, 0, 0, cv.INTER_AREA);
-            }
-            
-            updateStep('检测培养皿边界...');
-            
-            // Detect plate boundary
-            let gray = new cv.Mat();
-            cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
-            
-            let grayBlur = new cv.Mat();
-            cv.GaussianBlur(gray, grayBlur, new cv.Size(9, 9), 0);
-            
-            let circles = new cv.Mat();
-            cv.HoughCircles(grayBlur, circles, cv.HOUGH_GRADIENT, 1.2, 500, 50, 50, 400, 550);
-            
-            let plateCx, plateCy, plateRadius, agarRadius;
-            
-            if (circles.rows > 0) {
-                let bestCircle = circles.data32F;
-                plateCx = Math.round(bestCircle[0]);
-                plateCy = Math.round(bestCircle[1]);
-                plateRadius = Math.round(bestCircle[2]);
-                agarRadius = plateRadius - 10;
-            } else {
-                plateCx = Math.round(src.cols / 2);
-                plateCy = Math.round(src.rows / 2);
-                plateRadius = Math.round(Math.min(src.cols, src.rows) / 2 - 50);
-                agarRadius = plateRadius - 25;
-            }
-            
-            updateStep('图像增强...');
-            
-            // Convert to Lab and enhance
-            let lab = new cv.Mat();
-            cv.cvtColor(src, lab, cv.COLOR_RGB2Lab);
-            let labPlanes = new cv.MatVector();
-            cv.split(lab, labPlanes);
-            let lChannel = labPlanes.get(0);
-            
-            let clahe = new cv.CLAHE(3.0, new cv.Size(8, 8));
-            let lEnhanced = new cv.Mat();
-            clahe.apply(lChannel, lEnhanced);
-            
-            updateStep('检测菌落...');
-            
-            // Create mask
-            let agarMask = new cv.Mat.zeros(src.rows, src.cols, cv.CV_8U);
-            let safeRadius = agarRadius - params.edgeMargin;
-            cv.circle(agarMask, new cv.Point(plateCx, plateCy), safeRadius, new cv.Scalar(255), -1);
-            
-            // Adaptive threshold
-            let thresh = new cv.Mat();
-            cv.adaptiveThreshold(lEnhanced, thresh, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, 
-                                cv.THRESH_BINARY_INV, 25, 8);
-            
-            let maskedThresh = new cv.Mat();
-            cv.bitwise_and(thresh, agarMask, maskedThresh);
-            
-            // Morphological operations
-            let kernel = cv.Mat.ones(3, 3, cv.CV_8U);
-            let opening = new cv.Mat();
-            cv.morphologyEx(maskedThresh, opening, cv.MORPH_OPEN, kernel, new cv.Point(-1, -1), 1);
-            let closing = new cv.Mat();
-            cv.morphologyEx(opening, closing, cv.MORPH_CLOSE, kernel, new cv.Point(-1, -1), 2);
-            
-            updateStep('分水岭分割...');
-            
-            // Distance transform
-            let distTransform = new cv.Mat();
-            cv.distanceTransform(closing, distTransform, cv.DIST_L2, 5);
-            
-            // Find peaks
-            let dist8U = new cv.Mat();
-            distTransform.convertTo(dist8U, cv.CV_8U, 255);
-            
-            let peaks = [];
-            let distData = distTransform.data32F;
-            for (let y = 0; y < distTransform.rows; y += params.watershedMinDistance) {
-                for (let x = 0; x < distTransform.cols; x += params.watershedMinDistance) {
-                    let idx = y * distTransform.cols + x;
-                    if (distData[idx] > 0.3 * Math.max(...distData)) {
-                        peaks.push({x: x, y: y});
-                    }
-                }
-            }
-            
-            // Simple connected components instead of watershed
-            let labels = new cv.Mat();
-            cv.connectedComponents(closing, labels);
-            
-            updateStep('筛选菌落...');
-            
-            // Extract regions
-            let stats = new cv.Mat();
-            let centroids = new cv.Mat();
-            cv.connectedComponentsWithStats(closing, labels, stats, centroids);
-            
-            let candidates = [];
-            for (let i = 1; i < stats.rows; i++) {
-                let area = stats.data32S[i * stats.cols + 4];
-                if (params.minArea <= area && area <= params.maxArea) {
-                    let cx = Math.round(centroids.data64F[i * 2]);
-                    let cy = Math.round(centroids.data64F[i * 2 + 1]);
+                    // 获取参数
+                    const param2 = parseInt(document.getElementById('param2').value);
+                    const brightnessThreshold = parseInt(document.getElementById('brightnessThreshold').value);
+                    const minRadius = parseInt(document.getElementById('minRadius').value);
+                    const maxRadius = parseInt(document.getElementById('maxRadius').value);
                     
-                    let dx = cx - plateCx;
-                    let dy = cy - plateCy;
-                    let dist = Math.sqrt(dx*dx + dy*dy);
+                    // 高斯模糊
+                    let blurred = new cv.Mat();
+                    cv.GaussianBlur(grayMat, blurred, new cv.Size(5, 5), 0);
                     
-                    if (dist < safeRadius) {
-                        // Calculate circularity
-                        let perimeter = 2 * Math.PI * Math.sqrt(area / Math.PI);
-                        let circularity = 4 * Math.PI * area / (perimeter * perimeter);
-                        
-                        // Get intensity
-                        let intensity = lEnhanced.ucharAt(cy, cx);
-                        
-                        if (circularity >= params.minCircularity && intensity >= params.minIntensity) {
-                            candidates.push({
-                                centroid: [cx, cy],
-                                area: area,
-                                radius: Math.sqrt(area / Math.PI),
-                                circularity: circularity,
-                                intensity: intensity,
-                                distance: dist
-                            });
+                    // Hough圆检测
+                    let circles = new cv.Mat();
+                    cv.HoughCircles(
+                        blurred, 
+                        circles, 
+                        cv.HOUGH_GRADIENT, 
+                        1,              // dp
+                        14,             // minDist
+                        45,             // param1 (Canny高阈值)
+                        param2,         // param2 (累加器阈值)
+                        minRadius,      // minRadius
+                        maxRadius       // maxRadius
+                    );
+                    
+                    // 处理检测结果
+                    colonies = [];
+                    if (circles.cols > 0) {
+                        for (let i = 0; i < circles.cols; i++) {
+                            const x = circles.data32F[i * 3];
+                            const y = circles.data32F[i * 3 + 1];
+                            const radius = circles.data32F[i * 3 + 2];
+                            
+                            // 亮度验证 - 只保留足够亮的圆心
+                            const x1 = Math.max(0, Math.floor(x - 3));
+                            const y1 = Math.max(0, Math.floor(y - 3));
+                            const x2 = Math.min(grayMat.cols, Math.floor(x + 3));
+                            const y2 = Math.min(grayMat.rows, Math.floor(y + 3));
+                            
+                            let roi = grayMat.roi(new cv.Rect(x1, y1, x2 - x1, y2 - y1));
+                            let mean = cv.mean(roi);
+                            roi.delete();
+                            
+                            if (mean[0] > brightnessThreshold) {
+                                colonies.push({
+                                    id: i,
+                                    x: x,
+                                    y: y,
+                                    radius: radius,
+                                    brightness: mean[0],
+                                    manual: false
+                                });
+                            }
                         }
                     }
+                    
+                    // 清理
+                    blurred.delete();
+                    circles.delete();
+                    
+                    renderMarkers();
+                    updateStats();
+                    showToast(`✅ Hough圆检测完成！识别到 ${colonies.length} 个菌落`);
+                    
+                } catch (err) {
+                    console.error(err);
+                    showToast('❌ 分析失败: ' + err.message);
                 }
-            }
-            
-            updateStep('去重优化...');
-            
-            // NMS
-            candidates.sort((a, b) => b.area - a.area);
-            finalColonies = [];
-            
-            for (let c of candidates) {
-                let isDup = false;
-                for (let k of finalColonies) {
-                    let dx = c.centroid[0] - k.centroid[0];
-                    let dy = c.centroid[1] - k.centroid[1];
-                    if (Math.sqrt(dx*dx + dy*dy) < params.nmsDistance) {
-                        isDup = true;
-                        break;
-                    }
-                }
-                if (!isDup) {
-                    finalColonies.push(c);
-                }
-            }
-            
-            updateStep('绘制结果...');
-            
-            // Draw results
-            let result = src.clone();
-            let centerCount = 0;
-            let edgeCount = 0;
-            
-            for (let c of finalColonies) {
-                let color;
-                if (c.distance < safeRadius * 0.7) {
-                    color = new cv.Scalar(0, 255, 0, 255); // Green = center
-                    centerCount++;
-                } else {
-                    color = new cv.Scalar(255, 165, 0, 255); // Orange = edge
-                    edgeCount++;
-                }
-                cv.circle(result, new cv.Point(c.centroid[0], c.centroid[1]), 
-                         Math.round(c.radius), color, 2);
-                cv.circle(result, new cv.Point(c.centroid[0], c.centroid[1]), 2, 
-                         new cv.Scalar(255, 255, 255, 255), -1);
-            }
-            
-            // Draw boundary
-            cv.circle(result, new cv.Point(plateCx, plateCy), safeRadius, 
-                     new cv.Scalar(255, 255, 0, 255), 2);
-            
-            cv.imshow('resultCanvas', result);
-            currentResult = result;
-            
-            // Update statistics
-            document.getElementById('colonyCount').textContent = finalColonies.length;
-            
-            if (finalColonies.length > 0) {
-                let avgRadius = finalColonies.reduce((a, b) => a + b.radius, 0) / finalColonies.length;
-                document.getElementById('avgRadius').textContent = avgRadius.toFixed(1) + ' px';
-                document.getElementById('centerCount').textContent = centerCount + ' 个';
-                document.getElementById('edgeCount').textContent = edgeCount + ' 个';
-                document.getElementById('plateArea').textContent = 
-                    Math.round(finalColonies.length / (Math.PI * safeRadius * safeRadius / 10000) * 100) / 100 + ' %';
-            }
-            
-            // Cleanup
-            src.delete();
-            gray.delete();
-            grayBlur.delete();
-            circles.delete();
-            lab.delete();
-            labPlanes.delete();
-            lChannel.delete();
-            lEnhanced.delete();
-            agarMask.delete();
-            thresh.delete();
-            maskedThresh.delete();
-            kernel.delete();
-            opening.delete();
-            closing.delete();
-            distTransform.delete();
-            dist8U.delete();
-            labels.delete();
-            stats.delete();
-            centroids.delete();
-            
-            document.getElementById('processingStatus').classList.add('hidden');
-            document.getElementById('resultsSection').classList.remove('hidden');
-            document.getElementById('resultsSection').scrollIntoView({ behavior: 'smooth' });
+                
+                document.getElementById('loadingOverlay').classList.remove('active');
+            }, 100);
         }
-
-        function toggleParams() {
-            const section = document.getElementById('paramSection');
-            const arrow = document.getElementById('paramArrow');
-            section.classList.toggle('hidden');
-            arrow.classList.toggle('rotate-180');
+        
+        function renderMarkers() {
+            overlayLayer.innerHTML = '';
+            const scale = parseFloat(canvas.dataset.scale);
+            
+            colonies.forEach((colony, idx) => {
+                const marker = document.createElement('div');
+                marker.className = `colony-marker ${colony.manual ? 'manual' : ''}`;
+                marker.style.left = (colony.x * scale) + 'px';
+                marker.style.top = (colony.y * scale) + 'px';
+                
+                // 圆圈
+                if (showCircles || colony.manual) {
+                    const circle = document.createElement('div');
+                    circle.className = 'marker-circle';
+                    circle.style.width = (colony.radius * scale * 2) + 'px';
+                    circle.style.height = (colony.radius * scale * 2) + 'px';
+                    marker.appendChild(circle);
+                }
+                
+                // 中心点
+                const center = document.createElement('div');
+                center.className = 'marker-center';
+                marker.appendChild(center);
+                
+                // 提示
+                const tooltip = document.createElement('div');
+                tooltip.className = 'marker-tooltip';
+                tooltip.textContent = `#${idx + 1} | r=${Math.round(colony.radius)} | b=${Math.round(colony.brightness || 0)}`;
+                marker.appendChild(tooltip);
+                
+                // 点击删除
+                marker.onclick = (e) => {
+                    e.stopPropagation();
+                    removeColony(idx);
+                };
+                
+                overlayLayer.appendChild(marker);
+            });
         }
-
-        function resetAll() {
-            document.getElementById('uploadSection').classList.remove('hidden');
-            document.getElementById('processingStatus').classList.add('hidden');
-            document.getElementById('resultsSection').classList.add('hidden');
-            document.getElementById('fileInput').value = '';
-            document.getElementById('cameraInput').value = '';
+        
+        function updateStats() {
+            const auto = colonies.filter(c => !c.manual).length;
+            const manual = colonies.filter(c => c.manual).length;
+            const avgRadius = colonies.length > 0 
+                ? (colonies.reduce((sum, c) => sum + c.radius, 0) / colonies.length).toFixed(1)
+                : 0;
+            
+            document.getElementById('statTotal').textContent = colonies.length;
+            document.getElementById('statAuto').textContent = auto;
+            document.getElementById('statManual').textContent = manual;
+            document.getElementById('statAvgRadius').textContent = avgRadius;
+        }
+        
+        function removeColony(index) {
+            colonies.splice(index, 1);
+            colonies.forEach((c, idx) => c.id = idx);
+            renderMarkers();
+            updateStats();
+            showToast('🗑️ 已删除菌落标记');
+        }
+        
+        function toggleAddMode() {
+            isAddMode = !isAddMode;
+            const btn = document.getElementById('addModeBtn');
+            const indicator = document.getElementById('modeIndicator');
+            
+            if (isAddMode) {
+                btn.style.background = 'var(--success)';
+                btn.innerHTML = '<span>✓</span><span>完成添加</span>';
+                indicator.className = 'mode-indicator manual';
+                indicator.innerHTML = '<span>✏️</span><span>手动添加模式</span>';
+                canvas.style.cursor = 'crosshair';
+            } else {
+                btn.style.background = '';
+                btn.innerHTML = '<span>➕</span><span>手动添加</span>';
+                indicator.className = 'mode-indicator';
+                indicator.innerHTML = '<span>🔍</span><span>Hough圆检测模式</span>';
+                canvas.style.cursor = 'default';
+            }
+        }
+        
+        function toggleCircles() {
+            showCircles = !showCircles;
+            renderMarkers();
+            showToast(showCircles ? '⭕ 显示检测圆圈' : '⭕ 隐藏检测圆圈');
+        }
+        
+        function handleCanvasClick(e) {
+            if (!isAddMode) return;
+            
+            const rect = canvas.getBoundingClientRect();
+            const scale = parseFloat(canvas.dataset.scale);
+            const x = (e.clientX - rect.left) / scale;
+            const y = (e.clientY - rect.top) / scale;
+            
+            // 手动添加使用平均半径
+            const avgRadius = colonies.length > 0
+                ? colonies.reduce((sum, c) => sum + c.radius, 0) / colonies.length
+                : 10;
+            
+            colonies.push({
+                id: colonies.length,
+                x: x,
+                y: y,
+                radius: avgRadius,
+                brightness: 255,
+                manual: true
+            });
+            
+            renderMarkers();
+            updateStats();
+            showToast('✅ 已添加菌落标记');
+        }
+        
+        function clearAll() {
+            if (confirm('确定要清空所有标记吗？')) {
+                colonies = [];
+                renderMarkers();
+                updateStats();
+                showToast('🗑️ 已清空所有数据');
+            }
+        }
+        
+        function resetApp() {
+            if (srcMat) {
+                srcMat.delete();
+                srcMat = null;
+            }
+            if (grayMat) {
+                grayMat.delete();
+                grayMat = null;
+            }
             currentImage = null;
-            finalColonies = [];
-            if (currentResult) {
-                currentResult.delete();
-                currentResult = null;
-            }
+            colonies = [];
+            isAddMode = false;
+            
+            uploadCard.style.display = 'block';
+            viewer.classList.remove('active');
+            overlayLayer.innerHTML = '';
+            
+            // 重置UI
+            document.getElementById('addModeBtn').style.background = '';
+            document.getElementById('addModeBtn').innerHTML = '<span>➕</span><span>手动添加</span>';
+            document.getElementById('modeIndicator').className = 'mode-indicator';
+            document.getElementById('modeIndicator').innerHTML = '<span>🔍</span><span>Hough圆检测模式</span>';
+            canvas.style.cursor = 'default';
         }
-
-        function downloadResult() {
-            const canvas = document.getElementById('resultCanvas');
-            const link = document.createElement('a');
-            link.download = 'colony-count-' + new Date().getTime() + '.png';
-            link.href = canvas.toDataURL();
-            link.click();
+        
+        function exportResults() {
+            const data = {
+                timestamp: new Date().toISOString(),
+                algorithm: 'HoughCircles',
+                totalCount: colonies.length,
+                autoCount: colonies.filter(c => !c.manual).length,
+                manualCount: colonies.filter(c => c.manual).length,
+                avgRadius: document.getElementById('statAvgRadius').textContent,
+                parameters: {
+                    param2: parseInt(document.getElementById('param2').value),
+                    brightnessThreshold: parseInt(document.getElementById('brightnessThreshold').value),
+                    minRadius: parseInt(document.getElementById('minRadius').value),
+                    maxRadius: parseInt(document.getElementById('maxRadius').value)
+                },
+                colonies: colonies.map((c, i) => ({
+                    id: i + 1,
+                    x: Math.round(c.x),
+                    y: Math.round(c.y),
+                    radius: Math.round(c.radius * 10) / 10,
+                    brightness: Math.round(c.brightness || 0),
+                    type: c.manual ? 'manual' : 'hough'
+                }))
+            };
+            
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `hough_colony_count_${Date.now()}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+            
+            showToast('💾 结果已导出为JSON');
         }
-
-        window.onload = function() {
-            console.log('Colony Counter Pro v1.0 Ready');
-        };
+        
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 3000);
+        }
+        
+        // PWA Service Worker
+        if ('serviceWorker' in navigator) {
+            const swCode = `
+                self.addEventListener('install', e => self.skipWaiting());
+                self.addEventListener('activate', e => e.waitUntil(clients.claim()));
+                self.addEventListener('fetch', e => e.respondWith(fetch(e.request)));
+            `;
+            const blob = new Blob([swCode], { type: 'application/javascript' });
+            navigator.serviceWorker.register(URL.createObjectURL(blob))
+                .catch(() => console.log('SW registration skipped'));
+        }
     </script>
 </body>
 </html>
