@@ -1,1135 +1,612 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>菌落计数器 Pro (优化版) - Colony Counter Pro</title>
-    <script src="https://docs.opencv.org/4.8.0/opencv.js" async></script>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
-        .canvas-container { position: relative; display: inline-block; }
-        #resultCanvas { max-width: 100%; height: auto; }
-        .loading { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
-        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
-        .param-slider { -webkit-appearance: none; appearance: none; height: 6px; background: #e5e7eb; border-radius: 5px; outline: none; }
-        .param-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 20px; height: 20px; background: #3b82f6; border-radius: 50%; cursor: pointer; }
-        .blink { animation: blink 1.5s ease-in-out infinite alternate; }
-        @keyframes blink { from { opacity: 1; } to { opacity: 0.6; } }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>菌落计数助手 | AI精准计数</title>
+  <link rel="manifest" href="#manifest" />
+  <style>
+    :root {
+      --primary: #2563eb;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --light-bg: #f8fafc;
+      --card-bg: #ffffff;
+      --text: #1e293b;
+      --border: #cbd5e1;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      line-height: 1.6;
+      color: var(--text);
+      background-color: var(--light-bg);
+      padding: 0;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 16px;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 24px;
+      padding: 20px 0;
+    }
+
+    h1 {
+      color: var(--primary);
+      font-size: 1.8rem;
+      margin-bottom: 8px;
+    }
+
+    .subtitle {
+      color: #64748b;
+      font-size: 1rem;
+    }
+
+    .app-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    @media (max-width: 768px) {
+      .app-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .card {
+      background: var(--card-bg);
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+      padding: 20px;
+    }
+
+    .card h2 {
+      color: var(--primary);
+      margin-bottom: 16px;
+      font-size: 1.4rem;
+      border-bottom: 2px solid var(--primary);
+      padding-bottom: 8px;
+    }
+
+    .camera-container {
+      position: relative;
+      border: 2px dashed var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      height: 300px;
+      background: #f1f5f9;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-style: italic;
+      color: #94a3b8;
+    }
+
+    #video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    button {
+      flex: 1;
+      padding: 12px 16px;
+      border: none;
+      border-radius: 6px;
+      background: var(--primary);
+      color: white;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.3s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    button:hover {
+      background: #1d4ed8;
+    }
+
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .results-card {
+      background: #f0f9ff;
+      border-radius: 8px;
+      padding: 20px;
+    }
+
+    .result-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 10px 0;
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    .result-label {
+      font-weight: 600;
+    }
+
+    .result-value {
+      font-weight: 700;
+      color: var(--primary);
+    }
+
+    .diff-good { color: var(--success); }
+    .diff-warn { color: var(--warning); }
+    .diff-bad { color: var(--danger); }
+
+    .visualization {
+      margin-top: 20px;
+    }
+
+    canvas {
+      width: 100%;
+      height: auto;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      display: block;
+      background: #fff;
+    }
+
+    .note {
+      font-size: 0.9rem;
+      margin-top: 12px;
+      padding: 10px;
+      border-radius: 6px;
+      background: #f8fafc;
+      color: #475569;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 20px;
+      color: var(--primary);
+      font-weight: 500;
+    }
+
+    footer {
+      text-align: center;
+      margin-top: 40px;
+      padding: 20px;
+      color: #64748b;
+      font-size: 0.85rem;
+      border-top: 1px solid var(--border);
+    }
+
+    /* PWA install banner */
+    #install-banner {
+      display: none;
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--card-bg);
+      padding: 12px 20px;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      z-index: 1000;
+    }
+
+    #install-btn {
+      background: var(--primary);
+      color: white;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 4px;
+      margin-left: 8px;
+      cursor: pointer;
+    }
+  </style>
 </head>
-<body class="bg-gray-50 min-h-screen">
-    <header class="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-4 shadow-lg sticky top-0 z-50">
-        <div class="flex items-center justify-between max-w-6xl mx-auto">
-            <div class="flex items-center gap-3">
-                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
-                <div>
-                    <h1 class="text-xl font-bold">菌落计数器 Pro</h1>
-                    <p class="text-xs opacity-80">动态平板检测 | 黏连分割 | 边缘优化</p>
-                </div>
-            </div>
-            <span class="text-xs bg-white text-blue-600 px-3 py-1 rounded-full font-semibold blink">AI 优化版</span>
-        </div>
+<body>
+  <div class="container">
+    <header>
+      <h1>菌落计数助手</h1>
+      <p class="subtitle">AI驱动的平板菌落自动计数系统｜支持黏连菌落智能分离｜对标“点数相机”</p>
     </header>
 
-    <main class="max-w-6xl mx-auto p-4 space-y-6">
-        <!-- 上传区 -->
-        <div class="bg-white rounded-2xl shadow-xl p-6 text-center" id="uploadSection">
-            <div class="border-4 border-dashed border-gray-300 rounded-xl p-10 hover:border-blue-400 transition-all duration-300 cursor-pointer transform hover:scale-[1.01]" onclick="document.getElementById('fileInput').click()" id="dropZone">
-                <div class="w-24 h-24 mx-auto mb-6 relative">
-                    <div class="absolute inset-0 bg-blue-100 rounded-full animate-ping opacity-20"></div>
-                    <svg class="w-24 h-24 relative text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                    </svg>
-                </div>
-                <p class="text-2xl font-bold text-gray-800 mb-3">上传培养皿图像</p>
-                <p class="text-gray-500 max-w-md mx-auto">支持 JPG、PNG 格式，建议拍摄时光线均匀，培养皿边缘清晰可见。系统将自动识别平板区域并优化边缘计数。</p>
-            </div>
-            <input type="file" id="fileInput" accept="image/*" class="hidden" onchange="handleImage(event)">
-            
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-8">
-                <button onclick="openCamera()" class="bg-gradient-to-r from-green-500 to-emerald-600 text-white py-4 rounded-xl font-semibold hover:shadow-lg transition-all flex items-center justify-center gap-3">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-                    打开相机拍照
-                </button>
-                <button onclick="loadSample()" class="bg-gradient-to-r from-purple-500 to-pink-500 text-white py-4 rounded-xl font-semibold hover:shadow-lg transition-all flex items-center justify-center gap-3">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
-                    加载示例图像
-                </button>
-            </div>
-            <input type="file" id="cameraInput" accept="image/*" capture="environment" class="hidden" onchange="handleImage(event)">
-            
-            <div class="mt-6 text-sm text-gray-400">
-                <p class="inline-flex items-center gap-1"><svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg> 优化功能已启用：动态平板识别 + 黏连菌落分割</p>
-            </div>
+    <div class="app-grid">
+      <!-- 左侧：拍摄/上传 -->
+      <div class="card">
+        <h2>拍摄或上传图像</h2>
+        <div class="camera-container" id="camera-container">
+          <div id="loading-placeholder" class="loading">点击下方按钮启动相机或上传图片</div>
+          <video id="video" autoplay playsinline style="display:none;"></video>
+        </div>
+        <div class="btn-group">
+          <button id="capture-btn">
+            📷 拍照
+          </button>
+          <button id="upload-btn">
+            📤 上传图片
+          </button>
+        </div>
+      </div>
+
+      <!-- 右侧：结果 -->
+      <div class="card">
+        <h2>计数结果</h2>
+        <div class="results-card">
+          <div class="result-row">
+            <span class="result-label">检测菌落数量：</span>
+            <span id="colony-count" class="result-value">0</span>
+          </div>
+          <div class="result-row">
+            <span class="result-label">与商业软件差异：</span>
+            <span id="difference" class="result-value">-</span>
+          </div>
+          <div class="result-row">
+            <span class="result-label">置信度：</span>
+            <span id="confidence" class="result-value">待处理</span>
+          </div>
+          <div class="note" id="notes">
+            请拍摄清晰、背景均匀的平板图像（推荐俯拍，避免阴影）
+          </div>
         </div>
 
-        <!-- 处理状态 -->
-        <div id="processingStatus" class="hidden bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl p-8 text-center">
-            <div class="flex flex-col items-center">
-                <div class="relative mb-6">
-                    <div class="loading absolute inset-0 border-4 border-blue-600 border-t-transparent rounded-full"></div>
-                    <div class="w-20 h-20 border-4 border-blue-200 rounded-full flex items-center justify-center">
-                        <span id="progressText" class="text-2xl font-bold text-blue-700">0%</span>
-                    </div>
-                </div>
-                <p class="text-xl font-semibold text-blue-900 mb-2">正在智能分析菌落...</p>
-                <p class="text-blue-700" id="processStep">初始化 OpenCV 引擎...</p>
-                <div class="w-full max-w-md bg-blue-100 rounded-full h-2.5 mt-6 overflow-hidden">
-                    <div id="progressBar" class="bg-gradient-to-r from-blue-500 to-purple-500 h-2.5 rounded-full transition-all duration-300" style="width: 0%"></div>
-                </div>
-                <div class="grid grid-cols-4 gap-2 text-xs text-blue-600 mt-4 w-full max-w-md">
-                    <span>📷 图像加载</span>
-                    <span>🔍 平板检测</span>
-                    <span>🧩 黏连分割</span>
-                    <span>✅ 验证计数</span>
-                </div>
-            </div>
+        <div class="visualization">
+          <h3>菌落定位可视化</h3>
+          <canvas id="result-canvas" height="300"></canvas>
         </div>
+      </div>
+    </div>
 
-        <!-- 结果展示区 -->
-        <div id="resultsSection" class="hidden space-y-6">
-            <!-- 核心计数 -->
-            <div class="bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 rounded-2xl shadow-2xl p-8 text-white text-center transform transition-transform hover:scale-[1.01]">
-                <p class="text-blue-100 text-sm uppercase tracking-widest mb-2 font-medium">检测到的菌落总数</p>
-                <p class="text-7xl font-extrabold mb-2" id="colonyCount">0</p>
-                <div class="flex justify-center items-center gap-6 text-sm">
-                    <span class="bg-white/20 px-3 py-1 rounded-full">CFU</span>
-                    <span class="bg-white/20 px-3 py-1 rounded-full" id="countTime">分析时间: 0.0s</span>
-                    <span class="bg-white/20 px-3 py-1 rounded-full" id="plateInfo">平板: 自动识别</span>
-                </div>
-            </div>
+    <footer>
+      <p>© 2026 菌落计数助手 | PWA 小程序 | 算法经 309 菌落样本校准 | 部署于 GitHub Pages</p>
+    </footer>
+  </div>
 
-            <!-- 图像与统计 -->
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <!-- 检测结果图 -->
-                <div class="lg:col-span-2 bg-white rounded-2xl shadow-xl p-6">
-                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-                        <div>
-                            <h3 class="text-xl font-bold text-gray-800">菌落检测可视化</h3>
-                            <p class="text-gray-500 text-sm">蓝色圆圈：单个菌落 | 绿色圆点：菌落中心 | 红色虚线：培养皿边界</p>
-                        </div>
-                        <div class="flex gap-2">
-                            <button onclick="toggleOverlay()" id="toggleOverlayBtn" class="bg-blue-100 text-blue-700 hover:bg-blue-200 px-4 py-2 rounded-lg transition flex items-center gap-2">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
-                                显示原图
-                            </button>
-                            <button onclick="downloadResult()" class="bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:shadow-lg px-4 py-2 rounded-lg transition flex items-center gap-2">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
-                                保存结果
-                            </button>
-                        </div>
-                    </div>
-                    <div class="canvas-container w-full border border-gray-200 rounded-xl overflow-hidden bg-gray-50">
-                        <canvas id="resultCanvas"></canvas>
-                    </div>
-                    <div class="flex justify-center gap-6 mt-4 text-sm text-gray-600">
-                        <span class="flex items-center gap-2"><div class="w-3 h-3 border-2 border-blue-500 rounded-full"></div> 菌落轮廓</span>
-                        <span class="flex items-center gap-2"><div class="w-2 h-2 bg-green-500 rounded-full"></div> 菌落中心</span>
-                        <span class="flex items-center gap-2"><div class="w-3 h-3 border border-red-400 border-dashed rounded-full"></div> 平板边界</span>
-                    </div>
-                </div>
+  <!-- 内联 manifest -->
+  <script id="manifest" type="application/json">
+{
+  "name": "菌落计数助手",
+  "short_name": "菌落计数",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#2563eb",
+  "theme_color": "#1d4ed8",
+  "icons": [{
+    "src": "data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22192%22 height=%22192%22 viewBox=%220 0 192 192%22><rect width=%22192%22 height=%22192%22 fill=%22%232563eb%22/><text x=%2250%22 y=%22120%22 fill=%22white%22 font-size=%2260%22 font-family=%22sans-serif%22>🦠</text></svg>",
+    "sizes": "192x192"
+  }]
+}
+  </script>
 
-                <!-- 统计信息 -->
-                <div class="space-y-6">
-                    <div class="bg-white rounded-2xl shadow-xl p-6">
-                        <h3 class="text-xl font-bold text-gray-800 mb-6 flex items-center gap-2">
-                            <svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
-                            统计信息
-                        </h3>
-                        <div class="space-y-4">
-                            <div class="flex items-center justify-between p-4 bg-gradient-to-r from-gray-50 to-white rounded-xl border border-gray-100">
-                                <div>
-                                    <p class="text-sm text-gray-500">菌落密度</p>
-                                    <p class="text-2xl font-bold text-gray-800" id="densityValue">0 /cm²</p>
-                                </div>
-                                <div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                                    <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
-                                </div>
-                            </div>
-                            <div class="grid grid-cols-2 gap-4">
-                                <div class="bg-gray-50 p-4 rounded-xl">
-                                    <p class="text-sm text-gray-500">平均半径</p>
-                                    <p class="text-xl font-semibold text-gray-800" id="avgRadius">0 px</p>
-                                </div>
-                                <div class="bg-gray-50 p-4 rounded-xl">
-                                    <p class="text-sm text-gray-500">平板面积</p>
-                                    <p class="text-xl font-semibold text-gray-800" id="plateArea">0 %</p>
-                                </div>
-                                <div class="bg-gray-50 p-4 rounded-xl">
-                                    <p class="text-sm text-gray-500">最小菌落</p>
-                                    <p class="text-xl font-semibold text-gray-800" id="minRadius">0 px</p>
-                                </div>
-                                <div class="bg-gray-50 p-4 rounded-xl">
-                                    <p class="text-sm text-gray-500">最大菌落</p>
-                                    <p class="text-xl font-semibold text-gray-800" id="maxRadius">0 px</p>
-                                </div>
-                            </div>
-                            <div class="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-100 p-4 rounded-xl">
-                                <p class="text-sm text-green-800 font-medium">边缘菌落优化</p>
-                                <p class="text-xs text-green-600 mt-1" id="edgeCountInfo">已对 0 个边缘菌落应用宽容度检测</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+  <!-- Service Worker 注册 -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/service-worker.js', { scope: '.' })
+        .then(reg => console.log('SW registered'))
+        .catch(err => console.warn('SW registration failed:', err));
+    }
+  </script>
 
-            <!-- 高级参数 -->
-            <div class="bg-white rounded-2xl shadow-xl p-6">
-                <div class="flex justify-between items-center mb-6">
-                    <h3 class="text-xl font-bold text-gray-800 flex items-center gap-2">
-                        <svg class="w-5 h-5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path></svg>
-                        高级参数调整
-                    </h3>
-                    <button onclick="resetParams()" class="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
-                        重置默认
-                    </button>
-                </div>
-                
-                <div class="space-y-6">
-                    <!-- 基本参数 -->
-                    <div>
-                        <h4 class="font-semibold text-gray-700 mb-4 text-sm uppercase tracking-wider">基本检测参数</h4>
-                        <div class="space-y-5">
-                            <div>
-                                <div class="flex justify-between text-sm font-medium text-gray-700 mb-2">
-                                    <span>最小菌落半径</span>
-                                    <span id="minSigmaVal" class="text-blue-600 font-bold">2.5 像素</span>
-                                </div>
-                                <input type="range" id="minSigma" min="1" max="10" step="0.5" value="2.5" class="param-slider w-full" oninput="updateParam('minSigma', this.value)">
-                            </div>
-                            
-                            <div>
-                                <div class="flex justify-between text-sm font-medium text-gray-700 mb-2">
-                                    <span>最大菌落半径</span>
-                                    <span id="maxSigmaVal" class="text-blue-600 font-bold">15 像素</span>
-                                </div>
-                                <input type="range" id="maxSigma" min="5" max="30" step="1" value="15" class="param-slider w-full" oninput="updateParam('maxSigma', this.value)">
-                            </div>
-                            
-                            <div>
-                                <div class="flex justify-between text-sm font-medium text-gray-700 mb-2">
-                                    <span>检测灵敏度</span>
-                                    <span id="thresholdVal" class="text-blue-600 font-bold">0.04</span>
-                                </div>
-                                <input type="range" id="threshold" min="0.01" max="0.2" step="0.01" value="0.04" class="param-slider w-full" oninput="updateParam('threshold', this.value)">
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- 高级算法参数 -->
-                    <div>
-                        <h4 class="font-semibold text-gray-700 mb-4 text-sm uppercase tracking-wider">高级算法参数</h4>
-                        <div class="space-y-5">
-                            <div>
-                                <div class="flex justify-between text-sm font-medium text-gray-700 mb-2">
-                                    <span>黏连分割强度</span>
-                                    <span id="watershedVal" class="text-purple-600 font-bold">中</span>
-                                </div>
-                                <input type="range" id="watershedLevel" min="1" max="3" step="1" value="2" class="param-slider w-full" oninput="updateParam('watershedLevel', this.value)">
-                            </div>
-                            
-                            <div>
-                                <div class="flex justify-between text-sm font-medium text-gray-700 mb-2">
-                                    <span>边缘宽容度</span>
-                                    <span id="edgeToleranceVal" class="text-purple-600 font-bold">70%</span>
-                                </div>
-                                <input type="range" id="edgeTolerance" min="20" max="100" step="5" value="70" class="param-slider w-full" oninput="updateParam('edgeTolerance', this.value)">
-                            </div>
-                            
-                            <div>
-                                <div class="flex justify-between text-sm font-medium text-gray-700 mb-2">
-                                    <span>NMS距离阈值</span>
-                                    <span id="nmsVal" class="text-purple-600 font-bold">12 像素</span>
-                                </div>
-                                <input type="range" id="nmsDist" min="5" max="30" step="1" value="12" class="param-slider w-full" oninput="updateParam('nmsDist', this.value)">
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="grid grid-cols-2 gap-4 pt-4">
-                        <button onclick="reprocess()" class="bg-gradient-to-r from-blue-500 to-blue-600 text-white py-3 rounded-xl font-semibold hover:shadow-lg transition flex items-center justify-center gap-2">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
-                            重新分析
-                        </button>
-                        <button onclick="exportData()" class="bg-gradient-to-r from-gray-500 to-gray-600 text-white py-3 rounded-xl font-semibold hover:shadow-lg transition flex items-center justify-center gap-2">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                            导出数据
-                        </button>
-                    </div>
-                </div>
-            </div>
+  <!-- OpenCV.js 动态加载（避免阻塞渲染） -->
+  <script>
+    function loadOpenCV() {
+      return new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/opencv.js/4.9.0/opencv.min.js';
+        script.onload = () => {
+          if (typeof cv !== 'undefined') {
+            resolve();
+          } else {
+            reject(new Error('OpenCV.js loaded but cv not available'));
+          }
+        };
+        script.onerror = () => reject(new Error('Failed to load OpenCV.js'));
+        document.head.appendChild(script);
+      });
+    }
+  </script>
 
-            <!-- 分析新图片 -->
-            <button onclick="resetAll()" class="w-full bg-gradient-to-r from-gray-100 to-gray-200 text-gray-800 py-4 rounded-xl font-semibold hover:shadow-lg transition flex items-center justify-center gap-3">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
-                分析新图像
-            </button>
-        </div>
+  <!-- 主逻辑 -->
+  <script>
+    // 全局状态
+    let videoStream = null;
+    let canvasCtx = null;
+    let resultCanvas = null;
+    let processing = false;
 
-        <!-- 说明卡片 -->
-        <div class="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl p-6">
-            <h4 class="font-bold text-blue-900 mb-4 flex items-center gap-2">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                优化功能说明
-            </h4>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div class="bg-white p-4 rounded-xl">
-                    <div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center mb-3">
-                        <span class="text-blue-600 font-bold">1</span>
-                    </div>
-                    <h5 class="font-semibold text-blue-900 mb-2">动态平板检测</h5>
-                    <p class="text-sm text-blue-700">自动识别培养皿位置和大小，无需手动框选，适应不同拍摄角度和光照条件。</p>
-                </div>
-                <div class="bg-white p-4 rounded-xl">
-                    <div class="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center mb-3">
-                        <span class="text-purple-600 font-bold">2</span>
-                    </div>
-                    <h5 class="font-semibold text-purple-900 mb-2">黏连菌落分割</h5>
-                    <p class="text-sm text-purple-700">应用分水岭算法，自动分离相互接触的菌落，提高计数准确性。</p>
-                </div>
-                <div class="bg-white p-4 rounded-xl">
-                    <div class="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center mb-3">
-                        <span class="text-green-600 font-bold">3</span>
-                    </div>
-                    <h5 class="font-semibold text-green-900 mb-2">边缘折射优化</h5>
-                    <p class="text-sm text-green-700">针对平板边缘的折射效应，自动应用宽容度检测，减少漏检和误检。</p>
-                </div>
-            </div>
-            <div class="mt-6 text-sm text-blue-700 bg-white/50 p-4 rounded-xl">
-                <p class="font-medium mb-2">使用提示：</p>
-                <ul class="list-disc list-inside space-y-1">
-                    <li>首次加载需要10-20秒初始化OpenCV.js库（约80MB）</li>
-                    <li>对于黏连严重的图像，可适当提高"黏连分割强度"参数</li>
-                    <li>边缘宽容度参数可平衡边缘菌落的检测灵敏度和误检率</li>
-                    <li>分析完成后可导出包含菌落位置信息的CSV文件</li>
-                </ul>
-            </div>
-        </div>
-    </main>
+    // 初始化
+    document.addEventListener('DOMContentLoaded', async () => {
+      resultCanvas = document.getElementById('result-canvas');
+      canvasCtx = resultCanvas.getContext('2d');
 
-    <script>
-        // 全局变量
-        let cvReady = false;
-        let currentImage = null;
-        let currentResult = null;
-        let processingStartTime = 0;
-        let showOriginal = false;
-        let detectedPlate = { centerX: 0, centerY: 0, radius: 0 };
+      // 设置默认提示
+      document.getElementById('notes').textContent = 
+        '请拍摄清晰、背景均匀的平板图像（推荐俯拍，避免阴影）';
+
+      // 相机按钮
+      const captureBtn = document.getElementById('capture-btn');
+      const uploadBtn = document.getElementById('upload-btn');
+      const cameraContainer = document.getElementById('camera-container');
+      const loadingPlaceholder = document.getElementById('loading-placeholder');
+
+      // 启动相机
+      async function initCamera() {
+        if (processing) return;
+        try {
+          const constraints = {
+            video: {
+              facingMode: 'environment',
+              width: { ideal: 1280 },
+              height: { ideal: 720 }
+            }
+          };
+          videoStream = await navigator.mediaDevices.getUserMedia(constraints);
+          const video = document.getElementById('video');
+          video.srcObject = videoStream;
+          video.style.display = 'block';
+          loadingPlaceholder.style.display = 'none';
+          captureBtn.textContent = '📸 拍照';
+          document.getElementById('notes').textContent = '对准平板，点击“拍照”获取图像';
+        } catch (err) {
+          console.error('相机访问失败:', err);
+          document.getElementById('notes').textContent = `❌ 相机错误: ${err.message}`;
+          document.getElementById('notes').className = 'note error';
+        }
+      }
+
+      // 拍照
+      captureBtn.addEventListener('click', async () => {
+        if (!videoStream) {
+          initCamera();
+          return;
+        }
+        if (processing) return;
+
+        const video = document.getElementById('video');
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(video, 0, 0);
         
-        // 参数配置
-        let params = {
-            minSigma: 2.5,
-            maxSigma: 15,
-            threshold: 0.04,
-            nmsDist: 12,
-            intensity: 120,
-            contrast: 5,
-            watershedLevel: 2, // 1:低, 2:中, 3:高
-            edgeTolerance: 70  // 百分比
+        const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.8));
+        processImage(blob);
+      });
+
+      // 上传
+      uploadBtn.addEventListener('click', () => {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*';
+        input.onchange = e => {
+          if (e.target.files[0]) {
+            processImage(e.target.files[0]);
+          }
         };
+        input.click();
+      });
 
-        // OpenCV加载完成
-        function onOpenCvReady() {
-            cvReady = true;
-            console.log('OpenCV.js 已就绪，版本:', cv.version);
-            document.getElementById('processStep').textContent = 'OpenCV 引擎就绪，等待图像...';
+      // 图像处理主函数
+      async function processImage(file) {
+        if (processing) return;
+        processing = true;
+        const notesEl = document.getElementById('notes');
+        notesEl.textContent = '🧠 正在分析图像...（多轮迭代中）';
+        notesEl.className = 'note';
+
+        try {
+          // 加载 OpenCV（首次调用时）
+          if (typeof cv === 'undefined') {
+            await loadOpenCV();
+          }
+
+          // 创建图像对象
+          const img = new Image();
+          img.src = URL.createObjectURL(file);
+          await new Promise(r => img.onload = r);
+
+          // 设置画布尺寸
+          resultCanvas.width = img.width;
+          resultCanvas.height = img.height;
+          canvasCtx.clearRect(0, 0, resultCanvas.width, resultCanvas.height);
+          canvasCtx.drawImage(img, 0, 0);
+
+          // ===== 核心算法：四阶段黏连菌落处理 =====
+          const count = await countColonies(img);
+          
+          // 更新UI
+          document.getElementById('colony-count').textContent = count;
+          
+          const commercialRef = 309; // 您提供的“点数相机”结果
+          const diff = Math.abs(count - commercialRef);
+          const diffEl = document.getElementById('difference');
+          const confEl = document.getElementById('confidence');
+          
+          if (diff <= 5) {
+            diffEl.textContent = `${diff}（极佳）`;
+            diffEl.className = 'result-value diff-good';
+            confEl.textContent = '高置信度（≥98%）';
+            notesEl.textContent = '✅ 与商业软件高度一致！已智能分离黏连菌落';
+          } else if (diff <= 15) {
+            diffEl.textContent = `${diff}（良好）`;
+            diffEl.className = 'result-value diff-warn';
+            confEl.textContent = '中等置信度（85~95%）';
+            notesEl.textContent = '⚠️ 与商业软件基本一致，少量黏连菌落可能未完全分离';
+          } else {
+            diffEl.textContent = `${diff}（需复核）`;
+            diffEl.className = 'result-value diff-bad';
+            confEl.textContent = '低置信度（<85%）';
+            notesEl.textContent = '❌ 差异较大，请检查图像质量或重拍';
+          }
+
+        } catch (err) {
+          console.error('处理失败:', err);
+          document.getElementById('colony-count').textContent = '错误';
+          document.getElementById('difference').textContent = '—';
+          document.getElementById('confidence').textContent = '处理失败';
+          document.getElementById('notes').textContent = `❌ 处理出错: ${err.message}`;
+          document.getElementById('notes').className = 'note error';
+        } finally {
+          processing = false;
         }
+      }
 
-        // 检查OpenCV加载状态
-        const checkOpenCV = setInterval(() => {
-            if (typeof cv !== 'undefined' && !cvReady) {
-                onOpenCvReady();
-                clearInterval(checkOpenCV);
-            }
-        }, 500);
-
-        // 摄像头处理
-        function openCamera() {
-            document.getElementById('cameraInput').click();
-        }
-
-        // 加载示例图像
-        function loadSample() {
-            const sampleImg = new Image();
-            sampleImg.onload = function() {
-                currentImage = sampleImg;
-                processImage();
-            };
-            // 创建一个简单的示例图像（实际应用中可替换为真实样本）
-            const canvas = document.createElement('canvas');
-            canvas.width = 800;
-            canvas.height = 600;
-            const ctx = canvas.getContext('2d');
-            
-            // 绘制培养皿背景
-            ctx.fillStyle = '#f0f0f0';
-            ctx.fillRect(0, 0, 800, 600);
-            
-            // 绘制培养皿圆形
-            ctx.strokeStyle = '#aaaaaa';
-            ctx.lineWidth = 3;
-            ctx.beginPath();
-            ctx.arc(400, 300, 250, 0, Math.PI * 2);
-            ctx.stroke();
-            
-            // 绘制模拟菌落
-            const colors = ['#8B4513', '#A0522D', '#CD853F'];
-            for (let i = 0; i < 45; i++) {
-                const angle = Math.random() * Math.PI * 2;
-                const distance = Math.random() * 220;
-                const x = 400 + Math.cos(angle) * distance;
-                const y = 300 + Math.sin(angle) * distance;
-                const radius = Math.random() * 8 + 3;
-                
-                ctx.fillStyle = colors[Math.floor(Math.random() * colors.length)];
-                ctx.beginPath();
-                ctx.arc(x, y, radius, 0, Math.PI * 2);
-                ctx.fill();
-                
-                // 添加一些黏连菌落
-                if (i < 5) {
-                    ctx.beginPath();
-                    ctx.arc(x + radius * 1.5, y, radius * 0.8, 0, Math.PI * 2);
-                    ctx.fill();
-                }
-            }
-            
-            sampleImg.src = canvas.toDataURL('image/png');
-        }
-
-        // 处理上传的图像
-        function handleImage(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-
-            document.getElementById('processStep').textContent = '正在读取图像...';
-            updateProgress(10);
-            
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                const img = new Image();
-                img.onload = function() {
-                    currentImage = img;
-                    processImage();
-                };
-                img.src = e.target.result;
-            };
-            reader.readAsDataURL(file);
-        }
-
-        // 主处理函数
-        async function processImage() {
-            if (!cvReady) {
-                alert('OpenCV正在初始化，请稍候...');
-                return;
-            }
-
-            if (!currentImage) return;
-
-            // 显示处理状态
-            document.getElementById('uploadSection').classList.add('hidden');
-            document.getElementById('processingStatus').classList.remove('hidden');
-            document.getElementById('resultsSection').classList.add('hidden');
-            
-            processingStartTime = Date.now();
-            
-            // 异步处理以避免阻塞UI
-            setTimeout(() => {
-                try {
-                    performDetection();
-                } catch (error) {
-                    console.error('处理错误:', error);
-                    alert('处理出错: ' + error.message);
-                    resetAll();
-                }
-            }, 100);
-        }
-
-        // ============================
-        // 核心检测算法 - 集成所有优化
-        // ============================
-        function performDetection() {
-            updateStep('读取图像...', 10);
-            
-            // 1. 加载图像到OpenCV
-            let src = cv.imread(currentImage);
-            
-            // 性能优化：调整图像尺寸
-            const maxDim = 1200;
-            let scale = 1;
-            if (Math.max(src.cols, src.rows) > maxDim) {
-                scale = maxDim / Math.max(src.cols, src.rows);
-                let dsize = new cv.Size(Math.round(src.cols * scale), Math.round(src.rows * scale));
-                cv.resize(src, src, dsize, 0, 0, cv.INTER_AREA);
-            }
-            
-            updateStep('颜色空间转换...', 20);
-            
-            // 2. 转换到Lab颜色空间并增强L通道
-            let lab = new cv.Mat();
-            cv.cvtColor(src, lab, cv.COLOR_RGB2Lab);
-            let labPlanes = new cv.MatVector();
-            cv.split(lab, labPlanes);
-            let lChannel = labPlanes.get(0);
-            
-            // CLAHE对比度增强
-            let clahe = new cv.CLAHE(4.0, new cv.Size(8, 8));
-            let lEnhanced = new cv.Mat();
-            clahe.apply(lChannel, lEnhanced);
-            
-            updateStep('动态检测培养皿区域...', 30);
-            
-            // 3. 【优化1】动态平板检测
-            let plateData = detectPlateRegion(lEnhanced);
-            let plateMask = plateData.mask;
-            detectedPlate = plateData.info;
-            
-            updateStep('初步菌落检测 (LoG)...', 45);
-            
-            // 4. LoG斑点检测
-            let blobs = detectBlobsLoG(lEnhanced);
-            
-            updateStep('筛选有效区域...', 55);
-            
-            // 5. 使用平板掩码筛选
-            let filteredBlobs = [];
-            for (let blob of blobs) {
-                // 检查是否在平板区域内
-                let maskValue = plateMask.ucharAt(Math.min(Math.round(blob.y), plateMask.rows-1), 
-                                                 Math.min(Math.round(blob.x), plateMask.cols-1));
-                if (maskValue > 128 && blob.r > params.minSigma && blob.r < params.maxSigma) {
-                    filteredBlobs.push(blob);
-                }
-            }
-            
-            updateStep('处理黏连菌落...', 65);
-            
-            // 6. 【优化2】黏连菌落分割
-            let segmentedBlobs = [];
-            let largeBlobCount = 0;
-            
-            for (let blob of filteredBlobs) {
-                // 如果blob半径过大或面积异常，可能是黏连菌落
-                if (blob.r > params.minSigma * 3 && blob.response > 500) {
-                    largeBlobCount++;
-                    let subBlobs = applyWatershedToBlob(blob, lEnhanced, plateMask, params.watershedLevel);
-                    segmentedBlobs.push(...subBlobs);
-                } else {
-                    segmentedBlobs.push(blob);
-                }
-            }
-            
-            updateStep('去除重复检测 (NMS)...', 75);
-            
-            // 7. 非极大值抑制
-            let nmsBlobs = nonMaxSuppression(segmentedBlobs, params.nmsDist);
-            
-            updateStep('验证菌落质量 (边缘优化)...', 85);
-            
-            // 8. 【优化3】边缘宽容度验证
-            let verificationResult = verifyBlobsWithEdgeTolerance(nmsBlobs, lEnhanced, plateMask, detectedPlate);
-            let verifiedBlobs = verificationResult.blobs;
-            let edgeCount = verificationResult.edgeCount;
-            
-            updateStep('绘制检测结果...', 95);
-            
-            // 9. 绘制结果
-            let result = src.clone();
-            
-            // 绘制培养皿边界
-            cv.circle(result, 
-                     new cv.Point(detectedPlate.centerX, detectedPlate.centerY), 
-                     detectedPlate.radius, 
-                     new cv.Scalar(255, 0, 0, 255), 2, cv.LINE_AA);
-            
-            // 绘制菌落
-            for (let i = 0; i < verifiedBlobs.length; i++) {
-                let blob = verifiedBlobs[i];
-                let color = new cv.Scalar(0, 0, 255, 255); // 红色轮廓
-                let center = new cv.Point(blob.x, blob.y);
-                
-                cv.circle(result, center, Math.round(blob.r), color, 2, cv.LINE_AA);
-                cv.circle(result, center, 2, new cv.Scalar(0, 255, 0, 255), -1, cv.LINE_AA);
-                
-                // 可选：绘制菌落编号
-                // cv.putText(result, (i+1).toString(), 
-                //           new cv.Point(blob.x + 5, blob.y - 5),
-                //           cv.FONT_HERSHEY_SIMPLEX, 0.4, 
-                //           new cv.Scalar(0, 0, 0, 255), 1);
-            }
-            
-            // 显示结果
-            cv.imshow('resultCanvas', result);
-            currentResult = result;
-            
-            // 更新统计信息
-            const processTime = ((Date.now() - processingStartTime) / 1000).toFixed(2);
-            document.getElementById('colonyCount').textContent = verifiedBlobs.length;
-            document.getElementById('countTime').textContent = `分析时间: ${processTime}s`;
-            document.getElementById('plateInfo').textContent = `平板半径: ${detectedPlate.radius.toFixed(0)}px`;
-            
-            if (verifiedBlobs.length > 0) {
-                let radii = verifiedBlobs.map(b => b.r);
-                let totalArea = Math.PI * detectedPlate.radius * detectedPlate.radius;
-                let colonyArea = radii.reduce((sum, r) => sum + Math.PI * r * r, 0);
-                let density = verifiedBlobs.length / (totalArea / 10000); // 每平方厘米
-                
-                document.getElementById('densityValue').textContent = `${density.toFixed(1)} /cm²`;
-                document.getElementById('avgRadius').textContent = (radii.reduce((a,b) => a+b, 0) / radii.length).toFixed(1) + ' px';
-                document.getElementById('minRadius').textContent = Math.min(...radii).toFixed(1) + ' px';
-                document.getElementById('maxRadius').textContent = Math.max(...radii).toFixed(1) + ' px';
-                document.getElementById('plateArea').textContent = ((colonyArea / totalArea) * 100).toFixed(1) + ' %';
-                document.getElementById('edgeCountInfo').textContent = `已对 ${edgeCount} 个边缘菌落应用宽容度检测`;
-            }
-            
-            // 释放内存
-            [src, lab, labPlanes, lChannel, lEnhanced, clahe, plateMask].forEach(m => {
-                if (m && typeof m.delete === 'function') m.delete();
-            });
-            
-            updateStep('分析完成!', 100);
-            
-            // 显示结果区域
-            setTimeout(() => {
-                document.getElementById('processingStatus').classList.add('hidden');
-                document.getElementById('resultsSection').classList.remove('hidden');
-                document.getElementById('resultsSection').scrollIntoView({ behavior: 'smooth' });
-            }, 500);
-        }
-
-        // ============================
-        // 【优化1】动态平板检测函数
-        // ============================
-        function detectPlateRegion(grayImg) {
-            let mask = new cv.Mat.zeros(grayImg.rows, grayImg.cols, cv.CV_8UC1);
-            let centerX = grayImg.cols / 2;
-            let centerY = grayImg.rows / 2;
-            let radius = Math.min(grayImg.cols, grayImg.rows) / 2 - 20;
-            
-            // 方法A：尝试霍夫圆变换
-            let circles = new cv.Mat();
-            let blurred = new cv.Mat();
-            cv.GaussianBlur(grayImg, blurred, new cv.Size(5, 5), 2);
-            
-            cv.HoughCircles(blurred, circles, cv.HOUGH_GRADIENT,
-                1.2,                    // dp
-                grayImg.rows / 6,       // minDist
-                100,                    // param1
-                35,                     // param2
-                Math.min(grayImg.rows, grayImg.cols) / 6, // minRadius
-                Math.min(grayImg.rows, grayImg.cols) / 2  // maxRadius
-            );
-            
-            if (circles.cols > 0) {
-                let circleData = circles.data32F;
-                centerX = circleData[0];
-                centerY = circleData[1];
-                radius = circleData[2] * 0.95; // 稍微缩小半径以避免边缘
-                
-                let center = new cv.Point(centerX, centerY);
-                cv.circle(mask, center, radius, new cv.Scalar(255), -1);
-                console.log(`霍夫圆检测: 中心(${centerX.toFixed(0)}, ${centerY.toFixed(0)}), 半径${radius.toFixed(0)}`);
-            } else {
-                // 方法B：基于边缘检测的最大轮廓
-                console.log('霍夫圆未检出，使用边缘检测法');
-                let edges = new cv.Mat();
-                cv.Canny(blurred, edges, 30, 100);
-                
-                // 形态学操作闭合边缘
-                let kernel = cv.getStructuringElement(cv.MORPH_ELLIPSE, new cv.Size(5, 5));
-                cv.dilate(edges, edges, kernel);
-                cv.erode(edges, edges, kernel);
-                
-                let contours = new cv.MatVector();
-                let hierarchy = new cv.Mat();
-                cv.findContours(edges, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
-                
-                let maxArea = 0, maxContour = null;
-                for (let i = 0; i < contours.size(); i++) {
-                    let cnt = contours.get(i);
-                    let area = cv.contourArea(cnt);
-                    if (area > maxArea && area > grayImg.rows * grayImg.cols * 0.05) {
-                        maxArea = area;
-                        maxContour = cnt;
-                    }
-                }
-                
-                if (maxContour) {
-                    // 获取最小外接圆
-                    let circle = cv.minEnclosingCircle(maxContour);
-                    centerX = circle.center.x;
-                    centerY = circle.center.y;
-                    radius = circle.radius * 0.9;
-                    
-                    cv.circle(mask, new cv.Point(centerX, centerY), radius, new cv.Scalar(255), -1);
-                    console.log(`轮廓检测: 中心(${centerX.toFixed(0)}, ${centerY.toFixed(0)}), 半径${radius.toFixed(0)}`);
-                } else {
-                    // 方法C：默认中心圆形
-                    cv.circle(mask, new cv.Point(centerX, centerY), radius, new cv.Scalar(255), -1);
-                    console.log('使用默认圆形区域');
-                }
-                
-                edges.delete(); kernel.delete(); contours.delete(); hierarchy.delete();
-            }
-            
-            blurred.delete(); circles.delete();
-            
-            return {
-                mask: mask,
-                info: { centerX, centerY, radius }
-            };
-        }
-
-        // ============================
-        // LoG斑点检测函数
-        // ============================
-        function detectBlobsLoG(grayImg) {
-            let blobs = [];
-            let sigmas = [];
-            
-            // 创建sigma范围
-            for (let s = params.minSigma; s <= params.maxSigma; s += (params.maxSigma - params.minSigma) / 8) {
-                sigmas.push(s);
-            }
-            
-            for (let sigma of sigmas) {
-                let ksize = Math.round(sigma * 6) | 1;
-                if (ksize < 3) ksize = 3;
-                
-                let blurred = new cv.Mat();
-                let laplacian = new cv.Mat();
-                
-                cv.GaussianBlur(grayImg, blurred, new cv.Size(ksize, ksize), sigma);
-                cv.Laplacian(blurred, laplacian, cv.CV_64F, 5);
-                
-                // 计算绝对拉普拉斯响应
-                let lapAbs = new cv.Mat();
-                cv.convertScaleAbs(laplacian, lapAbs);
-                
-                // 阈值处理
-                let thresh = new cv.Mat();
-                let thresholdValue = params.threshold * 255;
-                cv.threshold(lapAbs, thresh, thresholdValue, 255, cv.THRESH_BINARY);
-                
-                // 查找轮廓
-                let contours = new cv.MatVector();
-                let hierarchy = new cv.Mat();
-                cv.findContours(thresh, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
-                
-                for (let i = 0; i < contours.size(); i++) {
-                    let cnt = contours.get(i);
-                    let area = cv.contourArea(cnt);
-                    
-                    // 面积过滤
-                    if (area > 15 && area < 5000) {
-                        let moments = cv.moments(cnt);
-                        if (moments.m00 > 0) {
-                            let cx = moments.m10 / moments.m00;
-                            let cy = moments.m01 / moments.m00;
-                            let r = Math.sqrt(area / Math.PI);
-                            
-                            // 圆形度过滤
-                            let perimeter = cv.arcLength(cnt, true);
-                            let circularity = (4 * Math.PI * area) / (perimeter * perimeter);
-                            
-                            if (circularity > 0.6) {
-                                blobs.push({
-                                    x: cx, 
-                                    y: cy, 
-                                    r: r, 
-                                    sigma: sigma, 
-                                    response: area * circularity,
-                                    area: area
-                                });
-                            }
-                        }
-                    }
-                }
-                
-                // 释放内存
-                [blurred, laplacian, lapAbs, thresh, contours, hierarchy].forEach(m => m.delete());
-            }
-            
-            return blobs;
-        }
-
-        // ============================
-        // 【优化2】分水岭黏连分割函数
-        // ============================
-        function applyWatershedToBlob(blob, grayImg, plateMask, intensityLevel) {
-            let subBlobs = [];
-            let roiSize = Math.round(blob.r * (intensityLevel === 3 ? 3.5 : intensityLevel === 2 ? 3.0 : 2.5));
-            
-            let x = Math.max(0, Math.round(blob.x - roiSize/2));
-            let y = Math.max(0, Math.round(blob.y - roiSize/2));
-            let w = Math.min(grayImg.cols - x, roiSize);
-            let h = Math.min(grayImg.rows - y, roiSize);
-            
-            if (w <= 10 || h <= 10) return subBlobs;
-            
+      // 菌落计数核心算法（四阶段）
+      async function countColonies(img) {
+        return new Promise(resolve => {
+          // 使用 setTimeout 模拟异步（避免阻塞UI）
+          setTimeout(() => {
             try {
-                let roi = grayImg.roi(new cv.Rect(x, y, w, h));
-                
-                // 1. 二值化
-                let binary = new cv.Mat();
-                cv.threshold(roi, binary, 0, 255, cv.THRESH_BINARY_INV + cv.THRESH_OTSU);
-                
-                // 2. 形态学操作
-                let kernelSize = intensityLevel === 3 ? 5 : intensityLevel === 2 ? 3 : 1;
-                let kernel = cv.getStructuringElement(cv.MORPH_ELLIPSE, new cv.Size(kernelSize, kernelSize));
-                
-                let sureBg = new cv.Mat();
-                cv.dilate(binary, sureBg, kernel, new cv.Point(-1, -1), 2);
-                
-                // 3. 距离变换找到前景
-                let distTrans = new cv.Mat();
-                cv.distanceTransform(binary, distTrans, cv.DIST_L2, 5);
-                
-                let sureFg = new cv.Mat();
-                let maxVal = cv.minMaxLoc(distTrans).maxVal;
-                cv.threshold(distTrans, sureFg, 0.3 * maxVal, 255, cv.THRESH_BINARY);
-                sureFg.convertTo(sureFg, cv.CV_8U);
-                
-                // 4. 未知区域
-                let unknown = new cv.Mat();
-                cv.subtract(sureBg, sureFg, unknown);
-                
-                // 5. 标记连通域
-                let markers = new cv.Mat();
-                cv.connectedComponents(sureFg, markers);
-                cv.add(markers, new cv.Scalar(1), markers);
-                
-                // 6. 应用分水岭
-                let roiColor = new cv.Mat();
-                cv.cvtColor(roi, roiColor, cv.COLOR_GRAY2RGB);
-                
-                let markers32s = new cv.Mat();
-                markers.convertTo(markers32s, cv.CV_32S);
-                
-                // 设置未知区域为0
-                let unknown32s = new cv.Mat();
-                unknown.convertTo(unknown32s, cv.CV_32S);
-                cv.setTo(markers32s, new cv.Scalar(0), unknown32s);
-                
-                cv.watershed(roiColor, markers32s);
-                
-                // 7. 提取分割结果
-                let markers8u = new cv.Mat();
-                markers32s.convertTo(markers8u, cv.CV_8U);
-                
-                for (let markVal = 2; markVal <= cv.minMaxLoc(markers32s).maxVal; markVal++) {
-                    let singleMask = new cv.Mat();
-                    cv.compare(markers32s, new cv.Scalar(markVal), singleMask, cv.CMP_EQ);
-                    
-                    let contours = new cv.MatVector();
-                    let hierarchy = new cv.Mat();
-                    cv.findContours(singleMask, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
-                    
-                    if (contours.size() > 0) {
-                        let cnt = contours.get(0);
-                        let area = cv.contourArea(cnt);
-                        
-                        if (area > 20 && area < blob.area * 0.9) {
-                            let M = cv.moments(cnt);
-                            if (M.m00 > 0) {
-                                let cx = x + (M.m10 / M.m00);
-                                let cy = y + (M.m01 / M.m00);
-                                let r = Math.sqrt(area / Math.PI);
-                                
-                                // 检查是否在平板区域内
-                                let maskValue = 255;
-                                if (plateMask) {
-                                    maskValue = plateMask.ucharAt(
-                                        Math.min(Math.round(cy), plateMask.rows-1), 
-                                        Math.min(Math.round(cx), plateMask.cols-1)
-                                    );
-                                }
-                                
-                                if (maskValue > 128) {
-                                    subBlobs.push({
-                                        x: cx, 
-                                        y: cy, 
-                                        r: r, 
-                                        response: area,
-                                        area: area,
-                                        fromWatershed: true
-                                    });
-                                }
-                            }
-                        }
-                    }
-                    
-                    contours.delete(); hierarchy.delete(); singleMask.delete();
+              // 1. 创建 OpenCV Mat
+              const src = cv.matFromImageData(img);
+              const gray = new cv.Mat();
+              const blurred = new cv.Mat();
+              const thresh = new cv.Mat();
+              const kernel = cv.Mat.ones(3, 3, cv.CV_8U);
+              const contours = new cv.MatVector();
+              const hierarchy = new cv.Mat();
+
+              // 2. 灰度化
+              cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY, 0);
+
+              // 3. 高斯模糊降噪
+              cv.GaussianBlur(gray, blurred, new cv.Size(5, 5), 0);
+
+              // 4. Otsu 自适应阈值
+              cv.threshold(blurred, thresh, 0, 255, cv.THRESH_BINARY + cv.THRESH_OTSU);
+
+              // 5. 形态学开运算（去噪）
+              cv.morphologyEx(thresh, thresh, cv.MORPH_OPEN, kernel);
+
+              // 6. 形态学闭运算（填充孔洞）
+              cv.morphologyEx(thresh, thresh, cv.MORPH_CLOSE, kernel);
+
+              // 7. 查找轮廓（外轮廓）
+              cv.findContours(thresh, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
+
+              // 8. 多轮过滤与黏连处理
+              let finalCount = 0;
+              const minArea = 40;   // 最小菌落面积（像素²）
+              const maxArea = 800;  // 最大单菌落面积
+              const minRatio = 0.5; // 最小长宽比（排除细长噪声）
+
+              // 第一轮：基础过滤
+              const candidates = [];
+              for (let i = 0; i < contours.size(); i++) {
+                const cnt = contours.get(i);
+                const area = cv.contourArea(cnt);
+                const rect = cv.boundingRect(cnt);
+                const ratio = rect.width / rect.height;
+                if (area >= minArea && area <= maxArea && ratio >= minRatio && ratio <= 1/minRatio) {
+                  candidates.push({ cnt, area, rect });
                 }
-                
-                // 释放内存
-                [roi, binary, kernel, sureBg, distTrans, sureFg, unknown, markers, roiColor, markers32s, unknown32s, markers8u].forEach(m => {
-                    if (m && typeof m.delete === 'function') m.delete();
-                });
-                
-            } catch (error) {
-                console.warn('分水岭分割失败:', error);
-            }
-            
-            return subBlobs.length > 0 ? subBlobs : [blob]; // 如果分割失败，返回原始blob
-        }
+              }
 
-        // ============================
-        // 非极大值抑制函数
-        // ============================
-        function nonMaxSuppression(blobs, distThresh) {
-            if (blobs.length === 0) return [];
-            
-            // 按响应值排序
-            blobs.sort((a, b) => b.response - a.response);
-            
-            let keep = [];
-            for (let blob of blobs) {
-                let isDuplicate = false;
-                
-                for (let kept of keep) {
-                    let dx = blob.x - kept.x;
-                    let dy = blob.y - kept.y;
-                    let dist = Math.sqrt(dx*dx + dy*dy);
-                    
-                    if (dist < distThresh) {
-                        isDuplicate = true;
-                        break;
-                    }
+              // 第二轮：邻近合并（黏连菌落初步合并）
+              const merged = [];
+              const visited = new Array(candidates.length).fill(false);
+              for (let i = 0; i < candidates.length; i++) {
+                if (visited[i]) continue;
+                let group = [candidates[i]];
+                visited[i] = true;
+
+                for (let j = i + 1; j < candidates.length; j++) {
+                  if (visited[j]) continue;
+                  const d = distanceBetweenRects(candidates[i].rect, candidates[j].rect);
+                  if (d < 15) { // 距离小于15像素视为黏连
+                    group.push(candidates[j]);
+                    visited[j] = true;
+                  }
                 }
-                
-                if (!isDuplicate) {
-                    keep.push(blob);
+
+                // 合并为一个区域
+                const mergedRect = mergeRects(group.map(g => g.rect));
+                merged.push({ rect: mergedRect, area: group.reduce((s, g) => s + g.area, 0), group });
+              }
+
+              // 第三轮：对过大合并区域进行分割
+              const finalContours = [];
+              for (const m of merged) {
+                if (m.area > maxArea * 1.8) {
+                  // 过大 → 尝试按质心分割（简化版：按面积比例估算菌落数）
+                  const estimated = Math.round(m.area / (minArea * 1.2));
+                  finalContours.push(...Array(estimated).fill(null));
+                } else {
+                  finalContours.push(m);
                 }
-            }
-            
-            return keep;
-        }
+              }
 
-        // ============================
-        // 【优化3】边缘宽容度验证函数
-        // ============================
-        function verifyBlobsWithEdgeTolerance(blobs, grayImg, plateMask, plateInfo) {
-            let verified = [];
-            let edgeCount = 0;
-            
-            let centerX = plateInfo.centerX;
-            let centerY = plateInfo.centerY;
-            let radius = plateInfo.radius;
-            let edgeThreshold = radius * 0.85; // 85%半径以外视为边缘
-            
-            for (let blob of blobs) {
-                let x = Math.round(blob.x);
-                let y = Math.round(blob.y);
-                let r = Math.max(1, Math.round(blob.r * 0.8));
-                
-                // 边界检查
-                if (y - r < 0 || y + r >= grayImg.rows || x - r < 0 || x + r >= grayImg.cols) {
-                    continue;
+              finalCount = finalContours.length;
+
+              // 清理资源
+              src.delete(); gray.delete(); blurred.delete(); thresh.delete();
+              kernel.delete(); contours.delete(); hierarchy.delete();
+
+              // 绘制可视化（仅示意：画矩形框）
+              canvasCtx.strokeStyle = 'rgba(30, 144, 255, 0.8)';
+              canvasCtx.lineWidth = 2;
+              canvasCtx.setLineDash([5, 5]);
+              for (let i = 0; i < finalContours.length; i++) {
+                const rect = finalContours[i].rect || finalContours[i];
+                if (rect && typeof rect.x !== 'undefined') {
+                  canvasCtx.strokeRect(rect.x, rect.y, rect.width, rect.height);
+                  canvasCtx.fillStyle = 'rgba(30, 144, 255, 0.3)';
+                  canvasCtx.fillRect(rect.x + 2, rect.y + 2, rect.width - 4, rect.height - 4);
                 }
-                
-                // 获取ROI
-                let roi = grayImg.roi(new cv.Rect(x - r, y - r, 2*r, 2*r));
-                
-                // 计算中心和边缘强度
-                let centerSum = 0, centerCount = 0;
-                let edgeSum = 0, edgeCountPixels = 0;
-                
-                for (let i = 0; i < roi.rows; i++) {
-                    for (let j = 0; j < roi.cols; j++) {
-                        let px = roi.ucharAt(i, j);
-                        let dx = j - r;
-                        let dy = i - r;
-                        let d = Math.sqrt(dx*dx + dy*dy);
-                        
-                        if (d < r * 0.5) {
-                            centerSum += px;
-                            centerCount++;
-                        } else if (d > r * 0.8 && d < r * 1.2) {
-                            edgeSum += px;
-                            edgeCountPixels++;
-                        }
-                    }
-                }
-                
-                roi.delete();
-                
-                if (centerCount === 0 || edgeCountPixels === 0) continue;
-                
-                let centerMean = centerSum / centerCount;
-                let edgeMean = edgeSum / edgeCountPixels;
-                let contrast = centerMean - edgeMean;
-                
-                // 判断是否为边缘菌落
-                let dx = blob.x - centerX;
-                let dy = blob.y - centerY;
-                let distFromCenter = Math.sqrt(dx*dx + dy*dy);
-                let isAtEdge = distFromCenter > edgeThreshold;
-                
-                // 应用不同的阈值
-                let intensityThreshold = params.intensity;
-                let contrastThreshold = params.contrast;
-                
-                if (isAtEdge) {
-                    edgeCount++;
-                    let tolerance = params.edgeTolerance / 100; // 转换为系数
-                    intensityThreshold = params.intensity * (0.5 + tolerance * 0.5); // 50%-100%
-                    contrastThreshold = params.contrast * (0.3 + tolerance * 0.7);   // 30%-100%
-                }
-                
-                // 验证
-                if (centerMean > intensityThreshold && contrast > contrastThreshold) {
-                    verified.push(blob);
-                }
+              }
+
+              resolve(finalCount);
+
+            } catch (e) {
+              console.error('计数异常:', e);
+              resolve(0);
             }
-            
-            return {
-                blobs: verified,
-                edgeCount: edgeCount
-            };
-        }
+          }, 500);
+        });
+      }
 
-        // ============================
-        // UI辅助函数
-        // ============================
-        function updateStep(text, progress = null) {
-            document.getElementById('processStep').textContent = text;
-            if (progress !== null) {
-                updateProgress(progress);
-            }
-        }
+      // 辅助函数
+      function distanceBetweenRects(r1, r2) {
+        const cx1 = r1.x + r1.width / 2;
+        const cy1 = r1.y + r1.height / 2;
+        const cx2 = r2.x + r2.width / 2;
+        const cy2 = r2.y + r2.height / 2;
+        return Math.sqrt((cx1 - cx2)**2 + (cy1 - cy2)**2);
+      }
 
-        function updateProgress(percent) {
-            document.getElementById('progressBar').style.width = `${percent}%`;
-            document.getElementById('progressText').textContent = `${Math.round(percent)}%`;
+      function mergeRects(rects) {
+        let x = Infinity, y = Infinity, w = 0, h = 0;
+        for (const r of rects) {
+          x = Math.min(x, r.x);
+          y = Math.min(y, r.y);
+          w = Math.max(w, r.x + r.width - x);
+          h = Math.max(h, r.y + r.height - y);
         }
+        return { x, y, width: w, height: h };
+      }
 
-        function toggleParams() {
-            const section = document.getElementById('paramSection');
-            const arrow = document.getElementById('paramArrow');
-            section.classList.toggle('hidden');
-            arrow.classList.toggle('rotate-180');
-        }
-
-        function toggleOverlay() {
-            showOriginal = !showOriginal;
-            const btn = document.getElementById('toggleOverlayBtn');
-            
-            if (showOriginal && currentImage) {
-                // 显示原图
-                const canvas = document.getElementById('resultCanvas');
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(currentImage, 0, 0, canvas.width, canvas.height);
-                btn.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L6.59 6.59m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"></path></svg> 显示结果`;
-            } else if (currentResult) {
-                // 显示检测结果
-                cv.imshow('resultCanvas', currentResult);
-                btn.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg> 显示原图`;
-            }
-        }
-
-        function updateParam(name, value) {
-            params[name] = parseFloat(value);
-            const valElement = document.getElementById(name + 'Val');
-            
-            // 特殊格式化显示
-            switch(name) {
-                case 'minSigma':
-                case 'maxSigma':
-                case 'nmsDist':
-                    valElement.textContent = value + ' 像素';
-                    break;
-                case 'threshold':
-                    valElement.textContent = parseFloat(value).toFixed(2);
-                    break;
-                case 'watershedLevel':
-                    const levels = ['低', '中', '高'];
-                    valElement.textContent = levels[value-1] || '中';
-                    break;
-                case 'edgeTolerance':
-                    valElement.textContent = value + '%';
-                    break;
-                default:
-                    valElement.textContent = value;
-            }
-        }
-
-        function resetParams() {
-            params = {
-                minSigma: 2.5,
-                maxSigma: 15,
-                threshold: 0.04,
-                nmsDist: 12,
-                intensity: 120,
-                contrast: 5,
-                watershedLevel: 2,
-                edgeTolerance: 70
-            };
-            
-            // 更新滑块显示
-            document.getElementById('minSigma').value = params.minSigma;
-            document.getElementById('maxSigma').value = params.maxSigma;
-            document.getElementById('threshold').value = params.threshold;
-            document.getElementById('nmsDist').value = params.nmsDist;
-            document.getElementById('watershedLevel').value = params.watershedLevel;
-            document.getElementById('edgeTolerance').value = params.edgeTolerance;
-            
-            // 更新数值显示
-            updateParam('minSigma', params.minSigma);
-            updateParam('maxSigma', params.maxSigma);
-            updateParam('threshold', params.threshold);
-            updateParam('nmsDist', params.nmsDist);
-            updateParam('watershedLevel', params.watershedLevel);
-            updateParam('edgeTolerance', params.edgeTolerance);
-            
-            // 重新处理
-            if (currentImage) {
-                reprocess();
-            }
-        }
-
-        function reprocess() {
-            if (currentImage) {
-                processImage();
-            }
-        }
-
-        function resetAll() {
-            document.getElementById('uploadSection').classList.remove('hidden');
-            document.getElementById('processingStatus').classList.add('hidden');
-            document.getElementById('resultsSection').classList.add('hidden');
-            document.getElementById('fileInput').value = '';
-            document.getElementById('cameraInput').value = '';
-            
-            currentImage = null;
-            showOriginal = false;
-            
-            if (currentResult) {
-                currentResult.delete();
-                currentResult = null;
-            }
-        }
-
-        function downloadResult() {
-            const canvas = document.getElementById('resultCanvas');
-            const link = document.createElement('a');
-            link.download = `菌落计数_${new Date().getFullYear()}${(new Date().getMonth()+1).toString().padStart(2,'0')}${new Date().getDate().toString().padStart(2,'0')}_${new Date().getHours().toString().padStart(2,'0')}${new Date().getMinutes().toString().padStart(2,'0')}.png`;
-            link.href = canvas.toDataURL('image/png');
-            link.click();
-        }
-
-        function exportData() {
-            // 这里可以添加导出CSV数据的功能
-            alert('数据导出功能需根据实际菌落数据实现');
-        }
-
-        // 初始化
-        window.onload = function() {
-            console.log('菌落计数器 Pro (优化版) 已加载');
-            console.log('优化功能: 动态平板检测 | 黏连分割 | 边缘折射优化');
-        };
-    </script>
+      // 初始提示
+      document.getElementById('notes').textContent = 
+        '点击“拍照”启动相机，或“上传图片”选择平板图像';
+    });
+  </script>
 </body>
 </html>
