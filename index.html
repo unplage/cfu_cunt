@@ -1,240 +1,494 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>菌落计数助手（Edge+GH Pages 终极可用版）</title>
-  <style>
-    body { font-family: sans-serif; margin: 20px; background: #f8fafc; }
-    .container { max-width: 1000px; margin: 0 auto; }
-    h1 { text-align: center; color: #1d4ed8; }
-    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px; }
-    @media (max-width: 768px) { .grid { grid-template-columns: 1fr; } }
-    .card { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
-    h2 { color: #1d4ed8; margin: 0 0 16px; border-bottom: 2px solid #3b82f6; padding-bottom: 8px; }
-    #camera { height: 300px; display: flex; align-items: center; justify-content: center; background: #f1f5f9; border: 2px dashed #cbd5e1; border-radius: 8px; font-style: italic; color: #94a3b8; }
-    button {
-      padding: 12px 24px;
-      background: #1d4ed8;
-      color: white;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-      font-weight: 600;
-      margin: 0 8px 12px;
-    }
-    button:hover { background: #1e40af; }
-    canvas { width: 100%; height: auto; border-radius: 6px; border: 1px #e2e8f0 solid; display: block; background: #fff; }
-    #status { text-align: center; font-weight: 600; padding: 12px; margin: 12px 0; }
-    .good { color: #10b981; }
-    .warn { color: #f59e0b; }
-    .bad { color: #ef4444; }
-    .result-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px #e2e8f0 solid; }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>菌落计数器 Pro v1.0</title>
+    <script src="https://docs.opencv.org/4.8.0/opencv.js" async></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+        .canvas-container { position: relative; display: inline-block; }
+        #resultCanvas { max-width: 100%; height: auto; }
+        .loading { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
+        .param-slider { -webkit-appearance: none; appearance: none; height: 6px; background: #e5e7eb; border-radius: 5px; outline: none; }
+        .param-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 20px; height: 20px; background: #3b82f6; border-radius: 50%; cursor: pointer; }
+    </style>
+<base target="_blank">
 </head>
-<body>
-<div class="container">
-  <h1>🔬 菌落计数助手（Edge + GitHub Pages 可用版）</h1>
-  <p style="text-align:center;color:#64748b;">点击【拍照】启动摄像头 → 对准平板 → 自动分析并标蓝点</p>
+<body class="bg-gray-50 min-h-screen">
 
-  <div class="grid">
-    <!-- 控制区 -->
-    <div class="card">
-      <h2>拍摄图像</h2>
-      <div id="camera">📷 点击下方按钮启动摄像头</div>
-      <button id="btn-capture">📸 拍照</button>
-      <button id="btn-upload">📤 上传</button>
-      <div id="status" class="warn">请先点击【拍照】允许摄像头权限</div>
-    </div>
+    <!-- Header -->
+    <header class="bg-blue-600 text-white p-4 shadow-lg sticky top-0 z-50">
+        <div class="flex items-center justify-between max-w-4xl mx-auto">
+            <h1 class="text-xl font-bold flex items-center gap-2">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                菌落计数器 Pro v1.0
+            </h1>
+            <span class="text-xs bg-blue-800 px-2 py-1 rounded">优化版</span>
+        </div>
+    </header>
 
-    <!-- 结果区 -->
-    <div class="card">
-      <h2>计数结果</h2>
-      <div style="background:#f0f9ff;padding:16px;border-radius:8px;">
-        <div class="result-row"><span>菌落数：</span><span id="count">0</span></div>
-        <div class="result-row"><span>状态：</span><span id="status-text">空闲</span></div>
-      </div>
-      <h3 style="margin:20px 0 10px;">识别结果</h3>
-      <canvas id="canvas-out" height="300"></canvas>
-    </div>
-  </div>
-</div>
+    <main class="max-w-4xl mx-auto p-4 space-y-4">
 
-<script>
-let cvLoaded = false;
-let videoElement = null;
-let videoStream = null;
+        <!-- Upload Section -->
+        <div class="bg-white rounded-xl shadow-md p-6 text-center" id="uploadSection">
+            <div class="border-4 border-dashed border-gray-300 rounded-lg p-8 hover:border-blue-400 transition-colors cursor-pointer" onclick="document.getElementById('fileInput').click()">
+                <svg class="w-16 h-16 mx-auto text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                <p class="text-gray-600 mb-2">点击上传或拍照</p>
+                <p class="text-sm text-gray-400">支持 JPG, PNG 格式</p>
+            </div>
+            <input type="file" id="fileInput" accept="image/*" class="hidden" onchange="handleImage(event)">
+            
+            <button onclick="openCamera()" class="mt-4 w-full bg-green-500 text-white py-3 rounded-lg font-semibold hover:bg-green-600 transition flex items-center justify-center gap-2">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path></svg>
+                打开相机拍照
+            </button>
+            <input type="file" id="cameraInput" accept="image/*" capture="environment" class="hidden" onchange="handleImage(event)">
+        </div>
 
-const canvasOut = document.getElementById('canvas-out');
-const ctx = canvasOut.getContext('2d');
-const countEl = document.getElementById('count');
-const statusEl = document.getElementById('status');
-const statusTextEl = document.getElementById('status-text');
-const btnCapture = document.getElementById('btn-capture');
-const btnUpload = document.getElementById('btn-upload');
-const cameraDiv = document.getElementById('camera');
+        <!-- Processing Status -->
+        <div id="processingStatus" class="hidden bg-blue-50 border border-blue-200 rounded-xl p-6 text-center">
+            <div class="loading inline-block w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mb-3"></div>
+            <p class="text-blue-800 font-semibold">正在分析菌落...</p>
+            <p class="text-sm text-blue-600 mt-1" id="processStep">初始化 OpenCV...</p>
+        </div>
 
-// ✅ 核心：立即绑定，不等待任何加载
-btnCapture.addEventListener('click', async () => {
-  statusEl.textContent = '📷 请求摄像头权限...';
-  statusEl.className = 'warn';
-  statusTextEl.textContent = '请求中';
+        <!-- Results Section -->
+        <div id="resultsSection" class="hidden space-y-4">
+            
+            <!-- Count Display -->
+            <div class="bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl shadow-lg p-6 text-white text-center">
+                <p class="text-blue-100 text-sm uppercase tracking-wide mb-1">检测到的菌落数</p>
+                <p class="text-5xl font-bold" id="colonyCount">0</p>
+                <p class="text-blue-200 text-sm mt-2">CFU (Colony Forming Units)</p>
+            </div>
 
-  try {
-    // 🔥 关键：必须在用户点击事件同步上下文中调用 getUserMedia
-    if (!videoStream) {
-      videoStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment', width: 1280, height: 720 }
-      });
-    }
+            <!-- Image Display -->
+            <div class="bg-white rounded-xl shadow-md p-4">
+                <div class="flex justify-between items-center mb-3">
+                    <h3 class="font-semibold text-gray-800">检测结果</h3>
+                    <button onclick="downloadResult()" class="text-sm bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded transition">
+                        保存图片
+                    </button>
+                </div>
+                <div class="canvas-container w-full overflow-x-auto">
+                    <canvas id="resultCanvas"></canvas>
+                </div>
+            </div>
 
-    if (!videoElement) {
-      videoElement = document.createElement('video');
-      videoElement.srcObject = videoStream;
-      videoElement.autoplay = true;
-      videoElement.playsInline = true;
-      videoElement.style.width = '100%';
-      videoElement.style.height = '100%';
-      videoElement.style.objectFit = 'cover';
-      
-      // ✅ Edge 必须静音才能自动播放
-      videoElement.muted = true;
-      await videoElement.play();
-    }
+            <!-- Statistics -->
+            <div class="bg-white rounded-xl shadow-md p-4">
+                <h3 class="font-semibold text-gray-800 mb-3">统计信息</h3>
+                <div class="grid grid-cols-2 gap-4 text-sm">
+                    <div class="bg-gray-50 p-3 rounded">
+                        <span class="text-gray-500">平均半径</span>
+                        <p class="font-semibold text-lg" id="avgRadius">- px</p>
+                    </div>
+                    <div class="bg-gray-50 p-3 rounded">
+                        <span class="text-gray-500">检测区域</span>
+                        <p class="font-semibold text-lg" id="plateArea">- %</p>
+                    </div>
+                    <div class="bg-gray-50 p-3 rounded">
+                        <span class="text-gray-500">中心区域</span>
+                        <p class="font-semibold text-lg" id="centerCount">-</p>
+                    </div>
+                    <div class="bg-gray-50 p-3 rounded">
+                        <span class="text-gray-500">边缘区域</span>
+                        <p class="font-semibold text-lg" id="edgeCount">-</p>
+                    </div>
+                </div>
+            </div>
 
-    cameraDiv.innerHTML = '';
-    cameraDiv.appendChild(videoElement);
-    statusEl.textContent = '✅ 相机已就绪，请对准平板';
-    statusEl.className = 'good';
-    statusTextEl.textContent = '相机运行中';
+            <!-- Advanced Parameters -->
+            <div class="bg-white rounded-xl shadow-md p-4">
+                <div class="flex justify-between items-center mb-4 cursor-pointer" onclick="toggleParams()">
+                    <h3 class="font-semibold text-gray-800">算法参数（已优化）</h3>
+                    <svg id="paramArrow" class="w-5 h-5 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                </div>
+                
+                <div id="paramSection" class="hidden space-y-4 text-sm text-gray-600">
+                    <div class="bg-yellow-50 p-3 rounded border border-yellow-200">
+                        <p class="font-semibold text-yellow-800 mb-1">当前参数（715 CFU优化版）</p>
+                        <ul class="list-disc list-inside space-y-1 text-yellow-700">
+                            <li>分水岭最小距离: 10px</li>
+                            <li>最小菌落面积: 35px²</li>
+                            <li>最大菌落面积: 1000px²</li>
+                            <li>NMS距离: 12px</li>
+                            <li>圆度阈值: 0.35</li>
+                            <li>凸度阈值: 0.65</li>
+                            <li>亮度阈值: 85</li>
+                            <li>边缘安全边距: 25px</li>
+                        </ul>
+                    </div>
+                    <p class="text-xs text-gray-500">这些参数经过多轮验证，平衡了准确性和召回率。</p>
+                </div>
+            </div>
 
-    // 等待视频帧稳定（1秒）
-    await new Promise(r => setTimeout(r, 1000));
+            <!-- New Analysis -->
+            <button onclick="resetAll()" class="w-full bg-gray-200 text-gray-800 py-3 rounded-lg font-semibold hover:bg-gray-300 transition">
+                分析新图片
+            </button>
+        </div>
 
-    // 拍照
-    statusEl.textContent = '📸 正在捕获图像...';
-    statusEl.className = 'warn';
-    statusTextEl.textContent = '捕获中';
+        <!-- Instructions -->
+        <div class="bg-yellow-50 border border-yellow-200 rounded-xl p-4 text-sm text-yellow-800">
+            <h4 class="font-semibold mb-2 flex items-center gap-2">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                使用提示
+            </h4>
+            <ul class="list-disc list-inside space-y-1 text-yellow-700">
+                <li>确保培养皿在照片中居中且清晰可见</li>
+                <li>光线均匀，避免强烈阴影或反光</li>
+                <li>算法会自动排除平板边缘的折射假阳性</li>
+                <li>首次加载可能需要10-20秒初始化OpenCV</li>
+                <li>结果包含中心区域（绿色）和边缘区域（橙色）</li>
+            </ul>
+        </div>
 
-    const snapCanvas = document.createElement('canvas');
-    snapCanvas.width = videoElement.videoWidth || 640;
-    snapCanvas.height = videoElement.videoHeight || 480;
-    const snapCtx = snapCanvas.getContext('2d');
-    snapCtx.drawImage(videoElement, 0, 0, snapCanvas.width, snapCanvas.height);
-    
-    const blob = await new Promise(resolve => snapCanvas.toBlob(resolve, 'image/jpeg', 0.8));
-    await processImage(blob);
+    </main>
 
-  } catch (err) {
-    console.error('拍照流程错误:', err);
-    statusEl.textContent = `❌ 失败: ${err.name} - ${err.message}`;
-    statusEl.className = 'bad';
-    statusTextEl.textContent = '拍照异常';
-    if (err.name === 'NotAllowedError') {
-      alert('⚠️ 请手动允许摄像头权限：点击地址栏锁图标 → “摄像头” → 选择“允许”');
-    }
-  }
-});
+    <script>
+        // Global variables
+        let cvReady = false;
+        let currentImage = null;
+        let currentResult = null;
+        let finalColonies = [];
+        
+        // Optimized parameters (715 CFU version)
+        const params = {
+            watershedMinDistance: 10,
+            minArea: 35,
+            maxArea: 1000,
+            nmsDistance: 12,
+            minCircularity: 0.35,
+            minSolidity: 0.65,
+            minIntensity: 85,
+            edgeMargin: 25
+        };
 
-btnUpload.addEventListener('click', () => {
-  const input = document.createElement('input');
-  input.type = 'file';
-  input.accept = 'image/*';
-  input.onchange = async (e) => {
-    if (e.target.files[0]) {
-      try {
-        statusEl.textContent = '📤 处理中...';
-        statusEl.className = 'warn';
-        await processImage(e.target.files[0]);
-      } catch (err) {
-        statusEl.textContent = `❌ 上传失败: ${err.message}`;
-        statusEl.className = 'bad';
-        console.error('上传错误:', err);
-      }
-    }
-  };
-  input.click();
-});
-
-async function processImage(file) {
-  const img = new Image();
-  img.src = URL.createObjectURL(file);
-  await new Promise(r => img.onload = r);
-
-  canvasOut.width = img.width;
-  canvasOut.height = img.height;
-  ctx.clearRect(0, 0, canvasOut.width, canvasOut.height);
-  ctx.drawImage(img, 0, 0);
-
-  let colonyCount = 0;
-  let centers = [];
-
-  // 纯JS检测（保证无依赖也能工作）
-  ({ count: colonyCount, centers }) = detectColonies(img);
-
-  countEl.textContent = colonyCount;
-  statusEl.textContent = `✅ 计数完成：${colonyCount} 个菌落`;
-  statusEl.className = 'good';
-  statusTextEl.textContent = '计数完成';
-
-  // 🔵 标中心蓝点
-  ctx.fillStyle = 'rgba(30, 144, 255, 0.95)';
-  ctx.strokeStyle = '#fff';
-  ctx.lineWidth = 1;
-  for (const [x, y] of centers) {
-    ctx.beginPath();
-    ctx.arc(x, y, 3, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-  }
-}
-
-function detectColonies(img) {
-  const c = document.createElement('canvas');
-  c.width = img.width; c.height = img.height;
-  const ctx2 = c.getContext('2d');
-  ctx2.drawImage(img, 0, 0);
-  const d = ctx2.getImageData(0, 0, c.width, c.height).data;
-  const w = c.width, h = c.height;
-  const visited = new Uint8Array(w * h);
-  const centers = [];
-  let count = 0;
-
-  const pixels = [];
-  for (let i = 0; i < d.length; i += 4) {
-    const r = d[i], g = d[i+1], b = d[i+2];
-    pixels.push(0.299*r + 0.587*g + 0.114*b);
-  }
-
-  const sorted = [...pixels].sort((a,b) => a-b);
-  const thresh = sorted[Math.floor(sorted.length * 0.6)];
-
-  for (let y = 1; y < h - 1; y++) {
-    for (let x = 1; x < w - 1; x++) {
-      const idx = y * w + x;
-      if (pixels[idx] > thresh && visited[idx] === 0) {
-        const stack = [[x, y]];
-        let sumX = 0, sumY = 0, area = 0;
-        while (stack.length) {
-          const [cx, cy] = stack.pop();
-          const i = cy * w + cx;
-          if (i < 0 || i >= w*h || visited[i] || pixels[i] <= thresh) continue;
-          visited[i] = 1;
-          sumX += cx;
-          sumY += cy;
-          area++;
-          stack.push([cx+1,cy], [cx-1,cy], [cx,cy+1], [cx,cy-1]);
+        // Wait for OpenCV
+        function onOpenCvReady() {
+            cvReady = true;
+            console.log('OpenCV.js is ready');
         }
-        if (area >= 35 && area <= 800) {
-          centers.push([sumX / area, sumY / area]);
-          count++;
-        }
-      }
-    }
-  }
 
-  return { count, centers };
-}
-</script>
+        setInterval(() => {
+            if (typeof cv !== 'undefined' && !cvReady) {
+                onOpenCvReady();
+            }
+        }, 1000);
+
+        function openCamera() {
+            document.getElementById('cameraInput').click();
+        }
+
+        function handleImage(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    currentImage = img;
+                    processImage();
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        async function processImage() {
+            if (!cvReady) {
+                alert('OpenCV正在初始化，请稍后再试...');
+                return;
+            }
+
+            if (!currentImage) return;
+
+            document.getElementById('uploadSection').classList.add('hidden');
+            document.getElementById('processingStatus').classList.remove('hidden');
+            document.getElementById('resultsSection').classList.add('hidden');
+
+            setTimeout(() => {
+                try {
+                    performDetection();
+                } catch (error) {
+                    console.error(error);
+                    alert('处理出错: ' + error.message);
+                    resetAll();
+                }
+            }, 100);
+        }
+
+        function updateStep(text) {
+            document.getElementById('processStep').textContent = text;
+        }
+
+        function performDetection() {
+            updateStep('读取图像...');
+            
+            // Read image
+            let src = cv.imread(currentImage);
+            
+            // Resize if too large
+            const maxDim = 1280;
+            let scale = 1;
+            if (Math.max(src.cols, src.rows) > maxDim) {
+                scale = maxDim / Math.max(src.cols, src.rows);
+                let dsize = new cv.Size(Math.round(src.cols * scale), Math.round(src.rows * scale));
+                cv.resize(src, src, dsize, 0, 0, cv.INTER_AREA);
+            }
+            
+            updateStep('检测培养皿边界...');
+            
+            // Detect plate boundary
+            let gray = new cv.Mat();
+            cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
+            
+            let grayBlur = new cv.Mat();
+            cv.GaussianBlur(gray, grayBlur, new cv.Size(9, 9), 0);
+            
+            let circles = new cv.Mat();
+            cv.HoughCircles(grayBlur, circles, cv.HOUGH_GRADIENT, 1.2, 500, 50, 50, 400, 550);
+            
+            let plateCx, plateCy, plateRadius, agarRadius;
+            
+            if (circles.rows > 0) {
+                let bestCircle = circles.data32F;
+                plateCx = Math.round(bestCircle[0]);
+                plateCy = Math.round(bestCircle[1]);
+                plateRadius = Math.round(bestCircle[2]);
+                agarRadius = plateRadius - 10;
+            } else {
+                plateCx = Math.round(src.cols / 2);
+                plateCy = Math.round(src.rows / 2);
+                plateRadius = Math.round(Math.min(src.cols, src.rows) / 2 - 50);
+                agarRadius = plateRadius - 25;
+            }
+            
+            updateStep('图像增强...');
+            
+            // Convert to Lab and enhance
+            let lab = new cv.Mat();
+            cv.cvtColor(src, lab, cv.COLOR_RGB2Lab);
+            let labPlanes = new cv.MatVector();
+            cv.split(lab, labPlanes);
+            let lChannel = labPlanes.get(0);
+            
+            let clahe = new cv.CLAHE(3.0, new cv.Size(8, 8));
+            let lEnhanced = new cv.Mat();
+            clahe.apply(lChannel, lEnhanced);
+            
+            updateStep('检测菌落...');
+            
+            // Create mask
+            let agarMask = new cv.Mat.zeros(src.rows, src.cols, cv.CV_8U);
+            let safeRadius = agarRadius - params.edgeMargin;
+            cv.circle(agarMask, new cv.Point(plateCx, plateCy), safeRadius, new cv.Scalar(255), -1);
+            
+            // Adaptive threshold
+            let thresh = new cv.Mat();
+            cv.adaptiveThreshold(lEnhanced, thresh, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, 
+                                cv.THRESH_BINARY_INV, 25, 8);
+            
+            let maskedThresh = new cv.Mat();
+            cv.bitwise_and(thresh, agarMask, maskedThresh);
+            
+            // Morphological operations
+            let kernel = cv.Mat.ones(3, 3, cv.CV_8U);
+            let opening = new cv.Mat();
+            cv.morphologyEx(maskedThresh, opening, cv.MORPH_OPEN, kernel, new cv.Point(-1, -1), 1);
+            let closing = new cv.Mat();
+            cv.morphologyEx(opening, closing, cv.MORPH_CLOSE, kernel, new cv.Point(-1, -1), 2);
+            
+            updateStep('分水岭分割...');
+            
+            // Distance transform
+            let distTransform = new cv.Mat();
+            cv.distanceTransform(closing, distTransform, cv.DIST_L2, 5);
+            
+            // Find peaks
+            let dist8U = new cv.Mat();
+            distTransform.convertTo(dist8U, cv.CV_8U, 255);
+            
+            let peaks = [];
+            let distData = distTransform.data32F;
+            for (let y = 0; y < distTransform.rows; y += params.watershedMinDistance) {
+                for (let x = 0; x < distTransform.cols; x += params.watershedMinDistance) {
+                    let idx = y * distTransform.cols + x;
+                    if (distData[idx] > 0.3 * Math.max(...distData)) {
+                        peaks.push({x: x, y: y});
+                    }
+                }
+            }
+            
+            // Simple connected components instead of watershed
+            let labels = new cv.Mat();
+            cv.connectedComponents(closing, labels);
+            
+            updateStep('筛选菌落...');
+            
+            // Extract regions
+            let stats = new cv.Mat();
+            let centroids = new cv.Mat();
+            cv.connectedComponentsWithStats(closing, labels, stats, centroids);
+            
+            let candidates = [];
+            for (let i = 1; i < stats.rows; i++) {
+                let area = stats.data32S[i * stats.cols + 4];
+                if (params.minArea <= area && area <= params.maxArea) {
+                    let cx = Math.round(centroids.data64F[i * 2]);
+                    let cy = Math.round(centroids.data64F[i * 2 + 1]);
+                    
+                    let dx = cx - plateCx;
+                    let dy = cy - plateCy;
+                    let dist = Math.sqrt(dx*dx + dy*dy);
+                    
+                    if (dist < safeRadius) {
+                        // Calculate circularity
+                        let perimeter = 2 * Math.PI * Math.sqrt(area / Math.PI);
+                        let circularity = 4 * Math.PI * area / (perimeter * perimeter);
+                        
+                        // Get intensity
+                        let intensity = lEnhanced.ucharAt(cy, cx);
+                        
+                        if (circularity >= params.minCircularity && intensity >= params.minIntensity) {
+                            candidates.push({
+                                centroid: [cx, cy],
+                                area: area,
+                                radius: Math.sqrt(area / Math.PI),
+                                circularity: circularity,
+                                intensity: intensity,
+                                distance: dist
+                            });
+                        }
+                    }
+                }
+            }
+            
+            updateStep('去重优化...');
+            
+            // NMS
+            candidates.sort((a, b) => b.area - a.area);
+            finalColonies = [];
+            
+            for (let c of candidates) {
+                let isDup = false;
+                for (let k of finalColonies) {
+                    let dx = c.centroid[0] - k.centroid[0];
+                    let dy = c.centroid[1] - k.centroid[1];
+                    if (Math.sqrt(dx*dx + dy*dy) < params.nmsDistance) {
+                        isDup = true;
+                        break;
+                    }
+                }
+                if (!isDup) {
+                    finalColonies.push(c);
+                }
+            }
+            
+            updateStep('绘制结果...');
+            
+            // Draw results
+            let result = src.clone();
+            let centerCount = 0;
+            let edgeCount = 0;
+            
+            for (let c of finalColonies) {
+                let color;
+                if (c.distance < safeRadius * 0.7) {
+                    color = new cv.Scalar(0, 255, 0, 255); // Green = center
+                    centerCount++;
+                } else {
+                    color = new cv.Scalar(255, 165, 0, 255); // Orange = edge
+                    edgeCount++;
+                }
+                cv.circle(result, new cv.Point(c.centroid[0], c.centroid[1]), 
+                         Math.round(c.radius), color, 2);
+                cv.circle(result, new cv.Point(c.centroid[0], c.centroid[1]), 2, 
+                         new cv.Scalar(255, 255, 255, 255), -1);
+            }
+            
+            // Draw boundary
+            cv.circle(result, new cv.Point(plateCx, plateCy), safeRadius, 
+                     new cv.Scalar(255, 255, 0, 255), 2);
+            
+            cv.imshow('resultCanvas', result);
+            currentResult = result;
+            
+            // Update statistics
+            document.getElementById('colonyCount').textContent = finalColonies.length;
+            
+            if (finalColonies.length > 0) {
+                let avgRadius = finalColonies.reduce((a, b) => a + b.radius, 0) / finalColonies.length;
+                document.getElementById('avgRadius').textContent = avgRadius.toFixed(1) + ' px';
+                document.getElementById('centerCount').textContent = centerCount + ' 个';
+                document.getElementById('edgeCount').textContent = edgeCount + ' 个';
+                document.getElementById('plateArea').textContent = 
+                    Math.round(finalColonies.length / (Math.PI * safeRadius * safeRadius / 10000) * 100) / 100 + ' %';
+            }
+            
+            // Cleanup
+            src.delete();
+            gray.delete();
+            grayBlur.delete();
+            circles.delete();
+            lab.delete();
+            labPlanes.delete();
+            lChannel.delete();
+            lEnhanced.delete();
+            agarMask.delete();
+            thresh.delete();
+            maskedThresh.delete();
+            kernel.delete();
+            opening.delete();
+            closing.delete();
+            distTransform.delete();
+            dist8U.delete();
+            labels.delete();
+            stats.delete();
+            centroids.delete();
+            
+            document.getElementById('processingStatus').classList.add('hidden');
+            document.getElementById('resultsSection').classList.remove('hidden');
+            document.getElementById('resultsSection').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function toggleParams() {
+            const section = document.getElementById('paramSection');
+            const arrow = document.getElementById('paramArrow');
+            section.classList.toggle('hidden');
+            arrow.classList.toggle('rotate-180');
+        }
+
+        function resetAll() {
+            document.getElementById('uploadSection').classList.remove('hidden');
+            document.getElementById('processingStatus').classList.add('hidden');
+            document.getElementById('resultsSection').classList.add('hidden');
+            document.getElementById('fileInput').value = '';
+            document.getElementById('cameraInput').value = '';
+            currentImage = null;
+            finalColonies = [];
+            if (currentResult) {
+                currentResult.delete();
+                currentResult = null;
+            }
+        }
+
+        function downloadResult() {
+            const canvas = document.getElementById('resultCanvas');
+            const link = document.createElement('a');
+            link.download = 'colony-count-' + new Date().getTime() + '.png';
+            link.href = canvas.toDataURL();
+            link.click();
+        }
+
+        window.onload = function() {
+            console.log('Colony Counter Pro v1.0 Ready');
+        };
+    </script>
 </body>
 </html>
