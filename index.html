@@ -235,7 +235,7 @@
     <div class="splash" id="splash">
         <div class="splash-icon">🔬</div>
         <div class="splash-text">菌落计数器 · 移动增强版</div>
-        <div class="splash-subtitle">霍夫圆 + ROI + 缩放</div>
+        <div class="splash-subtitle">霍夫圆 + ROI + 超小缩放</div>
         <div class="loading-bar"><div class="loading-progress"></div></div>
     </div>
     
@@ -244,7 +244,7 @@
             <h1>
                 <span>🔬</span>
                 <span>菌落计数器 Pro+</span>
-                <span class="version-badge">v4.2</span>
+                <span class="version-badge">v4.3</span>
             </h1>
         </header>
         
@@ -317,10 +317,10 @@
                             <div class="slider-header"><span class="slider-label">合并距离 (像素)</span><span class="slider-value" id="mergeDistValue">8</span></div>
                             <input type="range" id="mergeDist" min="2" max="20" value="8" step="1">
                         </div>
-                        <!-- 缩放滑块 - 范围扩大至0.2~3.0 -->
+                        <!-- 缩放滑块 - 范围 0.05 ~ 3.0，步进 0.05 -->
                         <div class="slider-group">
-                            <div class="slider-header"><span class="slider-label">图像缩放</span><span class="slider-value" id="zoomValue">1.0</span></div>
-                            <input type="range" id="zoomSlider" min="0.2" max="3.0" value="1.0" step="0.1">
+                            <div class="slider-header"><span class="slider-label">图像缩放</span><span class="slider-value" id="zoomValue">1.00</span></div>
+                            <input type="range" id="zoomSlider" min="0.05" max="3.0" value="1.0" step="0.05">
                         </div>
                         <div class="action-buttons">
                             <button class="btn btn-primary btn-small" id="analyzeBtn">🔄 重新分析</button>
@@ -332,7 +332,7 @@
                             <button class="btn btn-outline btn-small" id="backBtn">↩️ 新图片</button>
                         </div>
                         <div class="algo-info" style="margin-top:8px">
-                            <strong>提示：</strong>图片已自动适应屏幕，可滑动缩放查看细节。
+                            <strong>提示：</strong>图片已自动适应屏幕，缩放范围0.05~3.0，可滑动查看全局。
                         </div>
                     </div>
                 </div>
@@ -436,7 +436,7 @@
             document.getElementById('blurRadius').addEventListener('input', (e) => document.getElementById('blurValue').textContent = e.target.value);
             document.getElementById('mergeDist').addEventListener('input', (e) => document.getElementById('mergeDistValue').textContent = e.target.value);
             document.getElementById('zoomSlider').addEventListener('input', (e) => {
-                document.getElementById('zoomValue').textContent = parseFloat(e.target.value).toFixed(1);
+                document.getElementById('zoomValue').textContent = parseFloat(e.target.value).toFixed(2);
                 applyZoom();
             });
             
@@ -499,16 +499,15 @@
             canvas.dataset.origWidth = img.width;
             canvas.dataset.origHeight = img.height;
             
-            // 计算适应屏幕的缩放值（容器宽度 / 图片宽度）
+            // 计算适应屏幕的缩放值（容器宽度 / 图片宽度），但最小值限制为0.05
             const containerWidth = imageWrapper.clientWidth;
             let fitScale = containerWidth / img.width;
-            // 限制范围在0.2~3.0之间，但优先保证图片完整显示
-            fitScale = Math.min(3.0, Math.max(0.2, fitScale));
+            fitScale = Math.min(3.0, Math.max(0.05, fitScale));
             
             // 设置缩放滑块的值并应用
             const zoomSlider = document.getElementById('zoomSlider');
-            zoomSlider.value = fitScale.toFixed(1);
-            document.getElementById('zoomValue').textContent = fitScale.toFixed(1);
+            zoomSlider.value = fitScale.toFixed(2);
+            document.getElementById('zoomValue').textContent = fitScale.toFixed(2);
             applyZoom();
         }
         
@@ -541,13 +540,13 @@
             if (currentImage) {
                 const containerWidth = imageWrapper.clientWidth;
                 let fitScale = containerWidth / currentImage.width;
-                fitScale = Math.min(3.0, Math.max(0.2, fitScale));
-                document.getElementById('zoomSlider').value = fitScale.toFixed(1);
-                document.getElementById('zoomValue').textContent = fitScale.toFixed(1);
+                fitScale = Math.min(3.0, Math.max(0.05, fitScale));
+                document.getElementById('zoomSlider').value = fitScale.toFixed(2);
+                document.getElementById('zoomValue').textContent = fitScale.toFixed(2);
                 applyZoom();
             } else {
                 document.getElementById('zoomSlider').value = defaultParams.zoom;
-                document.getElementById('zoomValue').textContent = defaultParams.zoom.toFixed(1);
+                document.getElementById('zoomValue').textContent = defaultParams.zoom.toFixed(2);
                 applyZoom();
             }
             
@@ -965,9 +964,9 @@
             if (currentImage && viewer.classList.contains('active')) {
                 const containerWidth = imageWrapper.clientWidth;
                 let fitScale = containerWidth / currentImage.width;
-                fitScale = Math.min(3.0, Math.max(0.2, fitScale));
-                document.getElementById('zoomSlider').value = fitScale.toFixed(1);
-                document.getElementById('zoomValue').textContent = fitScale.toFixed(1);
+                fitScale = Math.min(3.0, Math.max(0.05, fitScale));
+                document.getElementById('zoomSlider').value = fitScale.toFixed(2);
+                document.getElementById('zoomValue').textContent = fitScale.toFixed(2);
                 applyZoom();
             }
         });
