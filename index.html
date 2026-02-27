@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#0f172a">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>菌落计数器 · 移动增强版</title>
+    <title>菌落计数器 · 精准版</title>
     
     <!-- OpenCV.js -->
     <script async src="https://docs.opencv.org/4.8.0/opencv.js" onload="onOpenCvReady();"></script>
@@ -30,7 +30,6 @@
         * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; overflow-x: hidden; }
         
-        /* 启动屏 */
         .splash { position: fixed; inset: 0; background: linear-gradient(135deg, #1e3a8a 0%, #0f172a 100%); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 9999; transition: opacity 0.5s; }
         .splash.hidden { opacity: 0; pointer-events: none; }
         .splash-icon { font-size: 100px; margin-bottom: 20px; animation: bounce 2s infinite; }
@@ -48,7 +47,6 @@
         
         main { flex: 1; padding: 20px; display: flex; flex-direction: column; gap: 20px; max-width: 1200px; margin: 0 auto; width: 100%; }
         
-        /* 上传卡片 */
         .upload-card { background: var(--card); border-radius: 24px; padding: 40px 30px; text-align: center; border: 2px dashed var(--secondary); transition: all 0.3s; cursor: pointer; }
         .upload-card:hover, .upload-card.active { border-color: var(--primary); background: rgba(59, 130, 246, 0.1); transform: translateY(-2px); }
         .upload-icon { font-size: 72px; margin-bottom: 20px; opacity: 0.9; }
@@ -64,12 +62,10 @@
         .btn-secondary:hover { background: #475569; }
         input[type="file"] { display: none; }
         
-        /* 查看器 */
         .viewer { display: none; flex-direction: column; gap: 20px; animation: fadeIn 0.5s; }
         .viewer.active { display: flex; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
         
-        /* 控制面板 - 增强版 */
         .control-panel { background: var(--card); border-radius: 20px; padding: 20px; display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
         .control-section { display: flex; flex-direction: column; gap: 12px; }
         .section-title { font-size: 0.9rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
@@ -80,6 +76,8 @@
         input[type="range"] { width: 100%; height: 6px; -webkit-appearance: none; background: var(--bg); border-radius: 3px; outline: none; }
         input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; background: var(--primary); border-radius: 50%; cursor: pointer; transition: transform 0.2s; }
         input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+        
+        select { width: 100%; padding: 8px; border-radius: 6px; background: var(--bg); color: var(--text); border: 1px solid var(--secondary); font-size: 0.9rem; }
         
         .action-buttons { display: flex; gap: 10px; flex-wrap: wrap; }
         .btn-small { padding: 10px 16px; font-size: 0.85rem; }
@@ -93,112 +91,23 @@
         .mode-indicator.manual { background: rgba(16, 185, 129, 0.2); color: var(--success); }
         .mode-indicator.roi { background: rgba(245, 158, 11, 0.2); color: var(--warning); }
         
-        /* 图像容器 - 支持缩放滚动 */
-        .image-wrapper { 
-            position: relative; 
-            background: var(--card); 
-            border-radius: 20px; 
-            overflow: auto;  /* 允许滚动查看放大区域 */
-            box-shadow: 0 10px 40px rgba(0,0,0,0.4);
-            max-height: 70vh;
-        }
-        .canvas-container { 
-            position: relative; 
-            display: inline-block; 
-            min-width: 100%; /* 保证至少填满容器宽度 */
-        }
-        #mainCanvas { 
-            display: block; 
-            width: auto;      /* 宽度由JS动态设置像素值 */
-            height: auto;
-            background: #1e293b;
-            max-width: none;  /* 确保滑块放大时不受限制 */
-        }
-        .overlay-layer { 
-            position: absolute; 
-            top: 0; 
-            left: 0; 
-            width: 100%; 
-            height: 100%; 
-            pointer-events: none; 
-        }
+        .image-wrapper { position: relative; background: var(--card); border-radius: 20px; overflow: auto; box-shadow: 0 10px 40px rgba(0,0,0,0.4); max-height: 70vh; }
+        .canvas-container { position: relative; display: inline-block; min-width: 100%; }
+        #mainCanvas { display: block; width: auto; height: auto; background: #1e293b; max-width: none; }
+        .overlay-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
         
-        /* ROI 指示器 */
-        .roi-marker { 
-            position: absolute; 
-            border: 3px solid gold; 
-            border-radius: 50%; 
-            background: var(--roi-color); 
-            pointer-events: none; 
-            box-shadow: 0 0 0 2px rgba(0,0,0,0.3); 
-            display: none; 
-        }
+        .roi-marker { position: absolute; border: 3px solid gold; border-radius: 50%; background: var(--roi-color); pointer-events: none; box-shadow: 0 0 0 2px rgba(0,0,0,0.3); display: none; }
         
-        /* 菌落标记 - 中心点缩小 */
-        .colony-marker { 
-            position: absolute; 
-            transform: translate(-50%, -50%); 
-            pointer-events: auto; 
-            cursor: pointer; 
-            z-index: 10; 
-            transition: all 0.2s; 
-        }
-        .marker-center { 
-            width: 5px; 
-            height: 5px; 
-            background: #00ff88; 
-            border: 1px solid white; 
-            border-radius: 50%; 
-            box-shadow: 0 1px 4px rgba(0,0,0,0.5); 
-            position: absolute; 
-            top: 50%; 
-            left: 50%; 
-            transform: translate(-50%, -50%); 
-        }
-        .marker-circle { 
-            position: absolute; 
-            top: 50%; 
-            left: 50%; 
-            transform: translate(-50%, -50%); 
-            border: 2px solid #ff4757; 
-            border-radius: 50%; 
-            opacity: 0.8; 
-        }
-        .colony-marker:hover { 
-            z-index: 20; 
-            transform: translate(-50%, -50%) scale(1.2); 
-        }
-        .colony-marker:hover .marker-center { 
-            background: #ff4757; 
-        }
-        .colony-marker.manual .marker-center { 
-            background: #ffd700; 
-        }
-        .colony-marker.manual .marker-circle { 
-            border-color: #ffd700; 
-        }
-        .marker-tooltip { 
-            position: absolute; 
-            bottom: 100%; 
-            left: 50%; 
-            transform: translateX(-50%); 
-            background: rgba(0,0,0,0.9); 
-            color: white; 
-            padding: 6px 10px; 
-            border-radius: 6px; 
-            font-size: 11px; 
-            white-space: nowrap; 
-            opacity: 0; 
-            transition: opacity 0.2s; 
-            pointer-events: none; 
-            margin-bottom: 5px; 
-            z-index: 30; 
-        }
-        .colony-marker:hover .marker-tooltip { 
-            opacity: 1; 
-        }
+        .colony-marker { position: absolute; transform: translate(-50%, -50%); pointer-events: auto; cursor: pointer; z-index: 10; transition: all 0.2s; }
+        .marker-center { width: 6px; height: 6px; background: #00ff88; border: 1px solid white; border-radius: 50%; box-shadow: 0 1px 4px rgba(0,0,0,0.5); position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
+        .marker-circle { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); border: 2px solid #ff4757; border-radius: 50%; opacity: 0.7; }
+        .colony-marker:hover { z-index: 20; transform: translate(-50%, -50%) scale(1.3); }
+        .colony-marker:hover .marker-center { background: #ff4757; }
+        .colony-marker.manual .marker-center { background: #ffd700; }
+        .colony-marker.manual .marker-circle { border-color: #ffd700; }
+        .marker-tooltip { position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.9); color: white; padding: 6px 10px; border-radius: 6px; font-size: 11px; white-space: nowrap; opacity: 0; transition: opacity 0.2s; pointer-events: none; margin-bottom: 5px; z-index: 30; }
+        .colony-marker:hover .marker-tooltip { opacity: 1; }
         
-        /* 统计面板 */
         .stats-panel { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 15px; }
         .stat-box { background: var(--card); border-radius: 16px; padding: 20px; text-align: center; border: 1px solid rgba(255,255,255,0.1); transition: transform 0.2s; }
         .stat-box:hover { transform: translateY(-2px); border-color: var(--primary); }
@@ -208,7 +117,6 @@
         .stat-box.warning .stat-number { color: var(--warning); }
         .stat-box.info .stat-number { color: var(--info); }
         
-        /* 加载遮罩 */
         .loading-overlay { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(10px); display: none; justify-content: center; align-items: center; flex-direction: column; z-index: 9998; }
         .loading-overlay.active { display: flex; }
         .spinner { width: 60px; height: 60px; border: 4px solid rgba(59, 130, 246, 0.2); border-top-color: var(--primary); border-radius: 50%; animation: spin 1s linear infinite; }
@@ -216,48 +124,37 @@
         .loading-text { margin-top: 20px; font-size: 1.1rem; color: var(--text); }
         .loading-subtext { margin-top: 10px; font-size: 0.9rem; color: var(--text-muted); }
         
-        /* Toast */
         .toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(100px); background: var(--card); color: var(--text); padding: 16px 24px; border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1); opacity: 0; transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55); z-index: 10000; display: flex; align-items: center; gap: 10px; font-weight: 500; }
         .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
         
         .algo-info { background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); padding: 12px 16px; border-radius: 0 8px 8px 0; font-size: 0.85rem; color: var(--text-muted); }
+        .param-tip { font-size: 0.75rem; color: var(--success); margin-top: 4px; }
         
-        @media (max-width: 768px) {
-            h1 { font-size: 1.3rem; }
-            .upload-title { font-size: 1.2rem; }
-            .control-panel { grid-template-columns: 1fr; }
-            .stats-panel { grid-template-columns: repeat(2, 1fr); }
-        }
+        @media (max-width: 768px) { h1 { font-size: 1.3rem; } .upload-title { font-size: 1.2rem; } .control-panel { grid-template-columns: 1fr; } .stats-panel { grid-template-columns: repeat(2, 1fr); } }
     </style>
 </head>
 <body>
-    <!-- 启动屏 -->
     <div class="splash" id="splash">
         <div class="splash-icon">🔬</div>
-        <div class="splash-text">菌落计数器 · 移动增强版</div>
-        <div class="splash-subtitle">霍夫圆 + ROI + 超小缩放</div>
+        <div class="splash-text">菌落计数器 · 精准版</div>
+        <div class="splash-subtitle">自适应亮度 + 多特征验证</div>
         <div class="loading-bar"><div class="loading-progress"></div></div>
     </div>
     
     <div class="app">
         <header>
-            <h1>
-                <span>🔬</span>
-                <span>菌落计数器 Pro+</span>
-                <span class="version-badge">v4.3</span>
-            </h1>
+            <h1><span>🔬</span><span>菌落计数器 Pro</span><span class="version-badge">v5.0</span></h1>
         </header>
         
         <main>
-            <!-- 上传区域 -->
             <div class="upload-card" id="uploadCard">
                 <div class="upload-icon">📤</div>
                 <div class="upload-title">拖放图片或点击上传</div>
                 <div class="upload-subtitle">JPG / PNG / WEBP</div>
                 <div class="upload-tips">
                     <div class="tip-item"><span>⚫</span><span>黑色背景最佳</span></div>
-                    <div class="tip-item"><span>💡</span><span>避免反光</span></div>
-                    <div class="tip-item"><span>🎯</span><span>可使用ROI限定皿区域</span></div>
+                    <div class="tip-item"><span>💡</span><span>光线均匀</span></div>
+                    <div class="tip-item"><span>🎯</span><span>可使用ROI</span></div>
                 </div>
                 <div class="btn-group">
                     <button class="btn btn-primary" onclick="document.getElementById('fileInput').click()"><span>📁</span><span>选择文件</span></button>
@@ -267,41 +164,65 @@
                 <input type="file" id="cameraInput" accept="image/*" capture="environment">
             </div>
             
-            <!-- 查看器 -->
             <div class="viewer" id="viewer">
-                <!-- 控制面板 -->
                 <div class="control-panel">
-                    <!-- 霍夫参数 -->
                     <div class="control-section">
-                        <div class="section-title">⚙️ Hough圆参数</div>
+                        <div class="section-title">⚙️ Hough圆检测</div>
                         <div class="slider-group">
-                            <div class="slider-header"><span class="slider-label">累加器阈值 (param2)</span><span class="slider-value" id="param2Value">16</span></div>
-                            <input type="range" id="param2" min="10" max="30" value="16" step="1">
+                            <div class="slider-header"><span class="slider-label">累加器阈值 (param2)</span><span class="slider-value" id="param2Value">14</span></div>
+                            <input type="range" id="param2" min="8" max="25" value="14" step="1">
+                            <div class="param-tip">✓ 推荐14-16（越小检测越多）</div>
+                        </div>
+                        <div class="slider-group">
+                            <div class="slider-header"><span class="slider-label">圆心最小距离</span><span class="slider-value" id="minDistValue">10</span></div>
+                            <input type="range" id="minDist" min="6" max="20" value="10" step="1">
+                            <div class="param-tip">密集平板用8-10</div>
                         </div>
                         <div class="slider-group">
                             <div class="slider-header"><span class="slider-label">最小半径</span><span class="slider-value" id="minRadiusValue">3</span></div>
-                            <input type="range" id="minRadius" min="2" max="10" value="3">
+                            <input type="range" id="minRadius" min="2" max="8" value="3">
                         </div>
                         <div class="slider-group">
-                            <div class="slider-header"><span class="slider-label">最大半径</span><span class="slider-value" id="maxRadiusValue">22</span></div>
-                            <input type="range" id="maxRadius" min="15" max="40" value="22">
+                            <div class="slider-header"><span class="slider-label">最大半径</span><span class="slider-value" id="maxRadiusValue">25</span></div>
+                            <input type="range" id="maxRadius" min="15" max="40" value="25">
                         </div>
                     </div>
                     
-                    <!-- 预处理 & ROI -->
+                    <div class="control-section">
+                        <div class="section-title">🔍 亮度验证模式</div>
+                        <div class="slider-group">
+                            <div class="slider-header"><span class="slider-label">阈值模式</span></div>
+                            <select id="thresholdMode">
+                                <option value="adaptive" selected>自适应（推荐）</option>
+                                <option value="fixed">固定阈值</option>
+                                <option value="relative">相对背景</option>
+                            </select>
+                        </div>
+                        <div class="slider-group" id="fixedThresholdGroup" style="display: none;">
+                            <div class="slider-header"><span class="slider-label">固定亮度阈值</span><span class="slider-value" id="fixedThresholdValue">170</span></div>
+                            <input type="range" id="fixedThreshold" min="120" max="220" value="170">
+                        </div>
+                        <div class="slider-group" id="adaptiveOffsetGroup">
+                            <div class="slider-header"><span class="slider-label">背景亮度偏移</span><span class="slider-value" id="adaptiveOffsetValue">25</span></div>
+                            <input type="range" id="adaptiveOffset" min="10" max="50" value="25">
+                            <div class="param-tip">菌落比背景亮多少</div>
+                        </div>
+                        <div class="slider-group">
+                            <div class="slider-header"><span class="slider-label">边缘对比度</span><span class="slider-value" id="edgeThresholdValue">10</span></div>
+                            <input type="range" id="edgeThreshold" min="5" max="30" value="10">
+                            <div class="param-tip">中心比边缘亮多少（圆的特征）</div>
+                        </div>
+                    </div>
+                    
                     <div class="control-section">
                         <div class="section-title">🖼️ 预处理 / ROI</div>
                         <div class="slider-group">
-                            <div class="slider-header"><span class="slider-label">对比度 (α)</span><span class="slider-value" id="contrastValue">1.2</span></div>
-                            <input type="range" id="contrast" min="0.5" max="2.5" value="1.2" step="0.1">
+                            <div class="slider-header"><span class="slider-label">对比度增强</span><span class="slider-value" id="contrastValue">1.5</span></div>
+                            <input type="range" id="contrast" min="1.0" max="3.0" value="1.5" step="0.1">
                         </div>
                         <div class="slider-group">
-                            <div class="slider-header"><span class="slider-label">亮度 (β)</span><span class="slider-value" id="brightnessValue">0</span></div>
-                            <input type="range" id="brightness" min="-50" max="50" value="0" step="1">
-                        </div>
-                        <div class="slider-group">
-                            <div class="slider-header"><span class="slider-label">高斯模糊半径</span><span class="slider-value" id="blurValue">3</span></div>
-                            <input type="range" id="blurRadius" min="1" max="9" value="3" step="2">
+                            <div class="slider-header"><span class="slider-label">高斯模糊</span><span class="slider-value" id="blurValue">5</span></div>
+                            <input type="range" id="blurRadius" min="1" max="9" value="5" step="2">
                         </div>
                         <div class="action-buttons">
                             <button class="btn btn-warning btn-small" id="selectRoiBtn">🎯 选择培养皿</button>
@@ -310,14 +231,12 @@
                         <div class="mode-indicator" id="roiIndicator" style="display: none;"><span>⭕</span><span>ROI已设定</span></div>
                     </div>
                     
-                    <!-- 后处理 & 操作 -->
                     <div class="control-section">
                         <div class="section-title">🧹 后处理 / 操作</div>
                         <div class="slider-group">
-                            <div class="slider-header"><span class="slider-label">合并距离 (像素)</span><span class="slider-value" id="mergeDistValue">8</span></div>
-                            <input type="range" id="mergeDist" min="2" max="20" value="8" step="1">
+                            <div class="slider-header"><span class="slider-label">合并距离</span><span class="slider-value" id="mergeDistValue">8</span></div>
+                            <input type="range" id="mergeDist" min="4" max="20" value="8">
                         </div>
-                        <!-- 缩放滑块 - 范围 0.05 ~ 3.0，步进 0.05 -->
                         <div class="slider-group">
                             <div class="slider-header"><span class="slider-label">图像缩放</span><span class="slider-value" id="zoomValue">1.00</span></div>
                             <input type="range" id="zoomSlider" min="0.05" max="3.0" value="1.0" step="0.05">
@@ -326,18 +245,14 @@
                             <button class="btn btn-primary btn-small" id="analyzeBtn">🔄 重新分析</button>
                             <button class="btn btn-success btn-small" id="addModeBtn">➕ 手动添加</button>
                             <button class="btn btn-info btn-small" id="toggleCirclesBtn">⭕ 显隐圆圈</button>
-                            <button class="btn btn-secondary btn-small" id="resetParamsBtn">↺ 恢复默认</button>
+                            <button class="btn btn-outline btn-small" id="resetParamsBtn">↺ 恢复默认</button>
                             <button class="btn btn-outline btn-small" id="exportImgBtn">📸 导出图片</button>
-                            <button class="btn btn-danger btn-small" id="clearBtn">🗑️ 清空标记</button>
+                            <button class="btn btn-danger btn-small" id="clearBtn">🗑️ 清空</button>
                             <button class="btn btn-outline btn-small" id="backBtn">↩️ 新图片</button>
-                        </div>
-                        <div class="algo-info" style="margin-top:8px">
-                            <strong>提示：</strong>图片已自动适应屏幕，缩放范围0.05~3.0，可滑动查看全局。
                         </div>
                     </div>
                 </div>
                 
-                <!-- 图像显示区域 -->
                 <div class="image-wrapper" id="imageWrapper">
                     <div class="canvas-container" id="canvasContainer">
                         <canvas id="mainCanvas"></canvas>
@@ -347,7 +262,6 @@
                     </div>
                 </div>
                 
-                <!-- 统计面板 -->
                 <div class="stats-panel">
                     <div class="stat-box"><span class="stat-number" id="statTotal">0</span><div class="stat-label">总菌落数</div></div>
                     <div class="stat-box success"><span class="stat-number" id="statAuto">0</span><div class="stat-label">Hough检测</div></div>
@@ -358,14 +272,12 @@
         </main>
     </div>
     
-    <!-- 加载遮罩 -->
     <div class="loading-overlay" id="loadingOverlay">
         <div class="spinner"></div>
         <div class="loading-text">分析中...</div>
-        <div class="loading-subtext">霍夫圆检测 + ROI过滤</div>
+        <div class="loading-subtext">自适应阈值 + 多特征验证</div>
     </div>
     
-    <!-- Toast -->
     <div class="toast" id="toast"></div>
 
     <script>
@@ -377,14 +289,11 @@
         let colonies = [];
         let isAddMode = false;
         let showCircles = true;
-        
-        // ROI相关
         let roiCenter = null;
         let roiRadius = null;
         let isRoiMode = false;
         let roiStart = null;
         
-        // DOM 元素
         const uploadCard = document.getElementById('uploadCard');
         const viewer = document.getElementById('viewer');
         const canvas = document.getElementById('mainCanvas');
@@ -393,51 +302,39 @@
         const roiVisual = document.getElementById('roiVisual');
         const imageWrapper = document.getElementById('imageWrapper');
         
-        // 默认参数值
-        const defaultParams = {
-            param2: 16,
-            minRadius: 3,
-            maxRadius: 22,
-            contrast: 1.2,
-            brightness: 0,
-            blurRadius: 3,
-            mergeDist: 8,
-            zoom: 1.0
-        };
+        const defaultParams = { param2: 14, minDist: 10, minRadius: 3, maxRadius: 25, contrast: 1.5, blurRadius: 5, mergeDist: 8, zoom: 1.0, adaptiveOffset: 25, edgeThreshold: 10, fixedThreshold: 170 };
         
-        // OpenCV 就绪
         function onOpenCvReady() {
             cvReady = true;
             document.querySelector('.splash-subtitle').textContent = 'OpenCV 加载完成';
-            setTimeout(() => {
-                document.getElementById('splash').classList.add('hidden');
-            }, 800);
+            setTimeout(() => document.getElementById('splash').classList.add('hidden'), 800);
         }
         
-        // 初始化事件
         document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('fileInput').addEventListener('change', handleFile);
             document.getElementById('cameraInput').addEventListener('change', handleFile);
             
             uploadCard.addEventListener('dragover', (e) => { e.preventDefault(); uploadCard.classList.add('active'); });
             uploadCard.addEventListener('dragleave', () => uploadCard.classList.remove('active'));
-            uploadCard.addEventListener('drop', (e) => {
-                e.preventDefault();
-                uploadCard.classList.remove('active');
-                if (e.dataTransfer.files.length) processFile(e.dataTransfer.files[0]);
-            });
+            uploadCard.addEventListener('drop', (e) => { e.preventDefault(); uploadCard.classList.remove('active'); if (e.dataTransfer.files.length) processFile(e.dataTransfer.files[0]); });
             
             // 滑块事件
-            document.getElementById('param2').addEventListener('input', (e) => document.getElementById('param2Value').textContent = e.target.value);
-            document.getElementById('minRadius').addEventListener('input', (e) => document.getElementById('minRadiusValue').textContent = e.target.value);
-            document.getElementById('maxRadius').addEventListener('input', (e) => document.getElementById('maxRadiusValue').textContent = e.target.value);
-            document.getElementById('contrast').addEventListener('input', (e) => document.getElementById('contrastValue').textContent = parseFloat(e.target.value).toFixed(1));
-            document.getElementById('brightness').addEventListener('input', (e) => document.getElementById('brightnessValue').textContent = e.target.value);
-            document.getElementById('blurRadius').addEventListener('input', (e) => document.getElementById('blurValue').textContent = e.target.value);
-            document.getElementById('mergeDist').addEventListener('input', (e) => document.getElementById('mergeDistValue').textContent = e.target.value);
+            ['param2', 'minDist', 'minRadius', 'maxRadius', 'contrast', 'blurRadius', 'mergeDist', 'adaptiveOffset', 'edgeThreshold', 'fixedThreshold'].forEach(id => {
+                document.getElementById(id).addEventListener('input', (e) => {
+                    const displayId = id + 'Value';
+                    const el = document.getElementById(displayId);
+                    if (el) el.textContent = e.target.value;
+                });
+            });
+            
             document.getElementById('zoomSlider').addEventListener('input', (e) => {
                 document.getElementById('zoomValue').textContent = parseFloat(e.target.value).toFixed(2);
                 applyZoom();
+            });
+            
+            document.getElementById('thresholdMode').addEventListener('change', (e) => {
+                document.getElementById('fixedThresholdGroup').style.display = e.target.value === 'fixed' ? 'block' : 'none';
+                document.getElementById('adaptiveOffsetGroup').style.display = e.target.value === 'adaptive' ? 'block' : 'none';
             });
             
             // 按钮
@@ -451,30 +348,24 @@
             document.getElementById('exportImgBtn').addEventListener('click', exportImage);
             document.getElementById('resetParamsBtn').addEventListener('click', resetToDefault);
             
-            // Canvas 交互 (鼠标+触摸)
+            // Canvas事件
             canvas.addEventListener('click', handleCanvasClick);
             canvas.addEventListener('mousedown', handleCanvasMouseDown);
             canvas.addEventListener('mousemove', handleCanvasMouseMove);
             canvas.addEventListener('mouseup', handleCanvasMouseUp);
             canvas.addEventListener('mouseleave', cancelRoiDraw);
-            // 触摸事件
             canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
             canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
             canvas.addEventListener('touchend', handleTouchEnd);
             canvas.addEventListener('touchcancel', cancelRoiDraw);
         });
         
-        // 文件处理
         function handleFile(e) { if (e.target.files.length) processFile(e.target.files[0]); }
         
         function processFile(file) {
             if (!file.type.startsWith('image/')) { showToast('❌ 请选择图片'); return; }
             const reader = new FileReader();
-            reader.onload = (e) => {
-                const img = new Image();
-                img.onload = () => { currentImage = img; initOpenCV(img); };
-                img.src = e.target.result;
-            };
+            reader.onload = (e) => { const img = new Image(); img.onload = () => { currentImage = img; initOpenCV(img); }; img.src = e.target.result; };
             reader.readAsDataURL(file);
         }
         
@@ -492,26 +383,20 @@
         }
         
         function displayImage(img) {
-            // 保持canvas像素为原图尺寸
             canvas.width = img.width;
             canvas.height = img.height;
             ctx.drawImage(img, 0, 0);
             canvas.dataset.origWidth = img.width;
             canvas.dataset.origHeight = img.height;
             
-            // 计算适应屏幕的缩放值（容器宽度 / 图片宽度），但最小值限制为0.05
             const containerWidth = imageWrapper.clientWidth;
             let fitScale = containerWidth / img.width;
             fitScale = Math.min(3.0, Math.max(0.05, fitScale));
-            
-            // 设置缩放滑块的值并应用
-            const zoomSlider = document.getElementById('zoomSlider');
-            zoomSlider.value = fitScale.toFixed(2);
+            document.getElementById('zoomSlider').value = fitScale.toFixed(2);
             document.getElementById('zoomValue').textContent = fitScale.toFixed(2);
             applyZoom();
         }
         
-        // 应用缩放
         function applyZoom() {
             const zoom = parseFloat(document.getElementById('zoomSlider').value);
             canvas.style.width = (canvas.width * zoom) + 'px';
@@ -519,24 +404,16 @@
             renderMarkers();
         }
         
-        // 恢复默认参数
         function resetToDefault() {
-            document.getElementById('param2').value = defaultParams.param2;
-            document.getElementById('param2Value').textContent = defaultParams.param2;
-            document.getElementById('minRadius').value = defaultParams.minRadius;
-            document.getElementById('minRadiusValue').textContent = defaultParams.minRadius;
-            document.getElementById('maxRadius').value = defaultParams.maxRadius;
-            document.getElementById('maxRadiusValue').textContent = defaultParams.maxRadius;
-            document.getElementById('contrast').value = defaultParams.contrast;
-            document.getElementById('contrastValue').textContent = defaultParams.contrast.toFixed(1);
-            document.getElementById('brightness').value = defaultParams.brightness;
-            document.getElementById('brightnessValue').textContent = defaultParams.brightness;
-            document.getElementById('blurRadius').value = defaultParams.blurRadius;
-            document.getElementById('blurValue').textContent = defaultParams.blurRadius;
-            document.getElementById('mergeDist').value = defaultParams.mergeDist;
-            document.getElementById('mergeDistValue').textContent = defaultParams.mergeDist;
-            
-            // 重置缩放为适应屏幕的缩放
+            Object.keys(defaultParams).forEach(key => {
+                const el = document.getElementById(key === 'zoom' ? 'zoomSlider' : key === 'adaptiveOffset' ? 'adaptiveOffset' : key === 'edgeThreshold' ? 'edgeThreshold' : key === 'fixedThreshold' ? 'fixedThreshold' : key);
+                if (el) {
+                    el.value = defaultParams[key];
+                    const displayId = key + 'Value';
+                    const displayEl = document.getElementById(displayId);
+                    if (displayEl) displayEl.textContent = typeof defaultParams[key] === 'number' && defaultParams[key] < 10 ? defaultParams[key].toFixed(2) : defaultParams[key];
+                }
+            });
             if (currentImage) {
                 const containerWidth = imageWrapper.clientWidth;
                 let fitScale = containerWidth / currentImage.width;
@@ -544,165 +421,43 @@
                 document.getElementById('zoomSlider').value = fitScale.toFixed(2);
                 document.getElementById('zoomValue').textContent = fitScale.toFixed(2);
                 applyZoom();
-            } else {
-                document.getElementById('zoomSlider').value = defaultParams.zoom;
-                document.getElementById('zoomValue').textContent = defaultParams.zoom.toFixed(2);
-                applyZoom();
             }
-            
             analyzeImage();
         }
         
-        // ---------- ROI 绘制逻辑 (支持触摸) ----------
-        function enterRoiMode() {
-            if (!currentImage) return;
-            isRoiMode = true;
-            canvas.style.cursor = 'crosshair';
-            showToast('在图像上按下/触摸确定圆心，拖动设定半径，松开完成ROI');
-        }
-        
-        function clearRoi() {
-            roiCenter = null;
-            roiRadius = null;
-            roiVisual.style.display = 'none';
-            document.getElementById('roiIndicator').style.display = 'none';
-            showToast('ROI已清除');
-        }
+        // ROI功能
+        function enterRoiMode() { if (!currentImage) return; isRoiMode = true; canvas.style.cursor = 'crosshair'; showToast('按下/触摸确定圆心，拖动设定半径'); }
+        function clearRoi() { roiCenter = null; roiRadius = null; roiVisual.style.display = 'none'; document.getElementById('roiIndicator').style.display = 'none'; showToast('ROI已清除'); }
         
         function updateRoiVisual() {
             if (!roiCenter || !roiRadius) { roiVisual.style.display = 'none'; return; }
             const zoom = parseFloat(document.getElementById('zoomSlider').value);
-            const left = (roiCenter.x - roiRadius) * zoom;
-            const top = (roiCenter.y - roiRadius) * zoom;
-            const size = roiRadius * 2 * zoom;
-            roiVisual.style.left = left + 'px';
-            roiVisual.style.top = top + 'px';
-            roiVisual.style.width = size + 'px';
-            roiVisual.style.height = size + 'px';
+            roiVisual.style.left = ((roiCenter.x - roiRadius) * zoom) + 'px';
+            roiVisual.style.top = ((roiCenter.y - roiRadius) * zoom) + 'px';
+            roiVisual.style.width = (roiRadius * 2 * zoom) + 'px';
+            roiVisual.style.height = (roiRadius * 2 * zoom) + 'px';
             roiVisual.style.display = 'block';
             document.getElementById('roiIndicator').style.display = 'inline-flex';
         }
         
-        // 从事件获取原始图像坐标
         function getImageCoordsFromEvent(e) {
             const rect = canvas.getBoundingClientRect();
             const zoom = parseFloat(document.getElementById('zoomSlider').value);
             let clientX, clientY;
-            if (e.touches) {
-                clientX = e.touches[0].clientX;
-                clientY = e.touches[0].clientY;
-                e.preventDefault();
-            } else {
-                clientX = e.clientX;
-                clientY = e.clientY;
-            }
-            const x = (clientX - rect.left) / zoom;
-            const y = (clientY - rect.top) / zoom;
-            return { x, y };
+            if (e.touches) { clientX = e.touches[0].clientX; clientY = e.touches[0].clientY; e.preventDefault(); }
+            else { clientX = e.clientX; clientY = e.clientY; }
+            return { x: (clientX - rect.left) / zoom, y: (clientY - rect.top) / zoom };
         }
         
-        function handleCanvasMouseDown(e) {
-            if (!isRoiMode) return;
-            const { x, y } = getImageCoordsFromEvent(e);
-            roiStart = { x, y };
-            roiVisual.style.display = 'block';
-        }
+        function handleCanvasMouseDown(e) { if (!isRoiMode) return; const { x, y } = getImageCoordsFromEvent(e); roiStart = { x, y }; roiVisual.style.display = 'block'; }
+        function handleCanvasMouseMove(e) { if (!isRoiMode || !roiStart) return; e.preventDefault(); const { x, y } = getImageCoordsFromEvent(e); const radius = Math.sqrt((x - roiStart.x)**2 + (y - roiStart.y)**2); const zoom = parseFloat(document.getElementById('zoomSlider').value); roiVisual.style.left = ((roiStart.x - radius) * zoom) + 'px'; roiVisual.style.top = ((roiStart.y - radius) * zoom) + 'px'; roiVisual.style.width = (radius * 2 * zoom) + 'px'; roiVisual.style.height = (radius * 2 * zoom) + 'px'; }
+        function handleCanvasMouseUp(e) { if (!isRoiMode || !roiStart) return; const { x, y } = getImageCoordsFromEvent(e); const radius = Math.sqrt((x - roiStart.x)**2 + (y - roiStart.y)**2); if (radius > 2) { roiCenter = { x: roiStart.x, y: roiStart.y }; roiRadius = radius; updateRoiVisual(); showToast(`ROI已设置: 半径${Math.round(radius)}px`); } else { clearRoi(); } isRoiMode = false; roiStart = null; canvas.style.cursor = 'default'; }
+        function handleTouchStart(e) { e.preventDefault(); if (!isRoiMode) return; const { x, y } = getImageCoordsFromEvent(e); roiStart = { x, y }; roiVisual.style.display = 'block'; }
+        function handleTouchMove(e) { e.preventDefault(); if (!isRoiMode || !roiStart) return; const { x, y } = getImageCoordsFromEvent(e); const radius = Math.sqrt((x - roiStart.x)**2 + (y - roiStart.y)**2); const zoom = parseFloat(document.getElementById('zoomSlider').value); roiVisual.style.left = ((roiStart.x - radius) * zoom) + 'px'; roiVisual.style.top = ((roiStart.y - radius) * zoom) + 'px'; roiVisual.style.width = (radius * 2 * zoom) + 'px'; roiVisual.style.height = (radius * 2 * zoom) + 'px'; }
+        function handleTouchEnd(e) { e.preventDefault(); if (!isRoiMode || !roiStart) return; const touch = e.changedTouches[0]; const rect = canvas.getBoundingClientRect(); const zoom = parseFloat(document.getElementById('zoomSlider').value); const x = (touch.clientX - rect.left) / zoom; const y = (touch.clientY - rect.top) / zoom; const radius = Math.sqrt((x - roiStart.x)**2 + (y - roiStart.y)**2); if (radius > 2) { roiCenter = { x: roiStart.x, y: roiStart.y }; roiRadius = radius; updateRoiVisual(); showToast(`ROI已设置: 半径${Math.round(radius)}px`); } else { clearRoi(); } isRoiMode = false; roiStart = null; canvas.style.cursor = 'default'; }
+        function cancelRoiDraw() { if (isRoiMode) { isRoiMode = false; roiStart = null; canvas.style.cursor = 'default'; roiVisual.style.display = roiCenter ? 'block' : 'none'; } }
         
-        function handleCanvasMouseMove(e) {
-            if (!isRoiMode || !roiStart) return;
-            e.preventDefault();
-            const { x, y } = getImageCoordsFromEvent(e);
-            const dx = x - roiStart.x;
-            const dy = y - roiStart.y;
-            const radius = Math.sqrt(dx*dx + dy*dy);
-            const zoom = parseFloat(document.getElementById('zoomSlider').value);
-            const left = (roiStart.x - radius) * zoom;
-            const top = (roiStart.y - radius) * zoom;
-            const size = radius * 2 * zoom;
-            roiVisual.style.left = left + 'px';
-            roiVisual.style.top = top + 'px';
-            roiVisual.style.width = size + 'px';
-            roiVisual.style.height = size + 'px';
-        }
-        
-        function handleCanvasMouseUp(e) {
-            if (!isRoiMode || !roiStart) return;
-            const { x, y } = getImageCoordsFromEvent(e);
-            const dx = x - roiStart.x;
-            const dy = y - roiStart.y;
-            const radius = Math.sqrt(dx*dx + dy*dy);
-            if (radius > 2) {
-                roiCenter = { x: roiStart.x, y: roiStart.y };
-                roiRadius = radius;
-                updateRoiVisual();
-                showToast(`ROI已设置: 圆心(${Math.round(roiCenter.x)},${Math.round(roiCenter.y)}) 半径${Math.round(radius)}`);
-            } else {
-                clearRoi();
-            }
-            isRoiMode = false;
-            roiStart = null;
-            canvas.style.cursor = 'default';
-        }
-        
-        function handleTouchStart(e) {
-            e.preventDefault();
-            if (!isRoiMode) return;
-            const { x, y } = getImageCoordsFromEvent(e);
-            roiStart = { x, y };
-            roiVisual.style.display = 'block';
-        }
-        
-        function handleTouchMove(e) {
-            e.preventDefault();
-            if (!isRoiMode || !roiStart) return;
-            const { x, y } = getImageCoordsFromEvent(e);
-            const dx = x - roiStart.x;
-            const dy = y - roiStart.y;
-            const radius = Math.sqrt(dx*dx + dy*dy);
-            const zoom = parseFloat(document.getElementById('zoomSlider').value);
-            const left = (roiStart.x - radius) * zoom;
-            const top = (roiStart.y - radius) * zoom;
-            const size = radius * 2 * zoom;
-            roiVisual.style.left = left + 'px';
-            roiVisual.style.top = top + 'px';
-            roiVisual.style.width = size + 'px';
-            roiVisual.style.height = size + 'px';
-        }
-        
-        function handleTouchEnd(e) {
-            e.preventDefault();
-            if (!isRoiMode || !roiStart) return;
-            const touch = e.changedTouches[0];
-            const rect = canvas.getBoundingClientRect();
-            const zoom = parseFloat(document.getElementById('zoomSlider').value);
-            const x = (touch.clientX - rect.left) / zoom;
-            const y = (touch.clientY - rect.top) / zoom;
-            const dx = x - roiStart.x;
-            const dy = y - roiStart.y;
-            const radius = Math.sqrt(dx*dx + dy*dy);
-            if (radius > 2) {
-                roiCenter = { x: roiStart.x, y: roiStart.y };
-                roiRadius = radius;
-                updateRoiVisual();
-                showToast(`ROI已设置: 圆心(${Math.round(roiCenter.x)},${Math.round(roiCenter.y)}) 半径${Math.round(radius)}`);
-            } else {
-                clearRoi();
-            }
-            isRoiMode = false;
-            roiStart = null;
-            canvas.style.cursor = 'default';
-        }
-        
-        function cancelRoiDraw() {
-            if (isRoiMode) {
-                isRoiMode = false;
-                roiStart = null;
-                canvas.style.cursor = 'default';
-                roiVisual.style.display = roiCenter ? 'block' : 'none';
-            }
-        }
-        
-        // ---------- 核心分析 ----------
+        // ========== 核心改进：analyzeImage ==========
         function analyzeImage() {
             if (!grayMat || !cvReady) return;
             document.getElementById('loadingOverlay').classList.add('active');
@@ -710,24 +465,43 @@
             setTimeout(() => {
                 try {
                     const param2 = parseInt(document.getElementById('param2').value);
+                    const minDist = parseInt(document.getElementById('minDist').value);
                     const minRadius = parseInt(document.getElementById('minRadius').value);
                     const maxRadius = parseInt(document.getElementById('maxRadius').value);
                     const contrast = parseFloat(document.getElementById('contrast').value);
-                    const brightness = parseInt(document.getElementById('brightness').value);
                     const blurRadius = parseInt(document.getElementById('blurRadius').value);
                     const mergeDist = parseInt(document.getElementById('mergeDist').value);
+                    const thresholdMode = document.getElementById('thresholdMode').value;
+                    const adaptiveOffset = parseInt(document.getElementById('adaptiveOffset').value);
+                    const edgeThreshold = parseInt(document.getElementById('edgeThreshold').value);
+                    const fixedThreshold = parseInt(document.getElementById('fixedThreshold').value);
                     
-                    let procMat = grayMat.clone();
-                    procMat.convertTo(procMat, -1, contrast, brightness);
+                    // 1. 对比度增强
+                    let procMat = new cv.Mat();
+                    grayMat.convertTo(procMat, -1, contrast, 0);
                     
+                    // 2. CLAHE自适应直方图均衡
+                    let clahe = new cv.CLAHE(2.0, new cv.Size(8, 8));
+                    let enhanced = new cv.Mat();
+                    clahe.apply(procMat, enhanced);
+                    
+                    // 3. 高斯模糊
                     let blurred = new cv.Mat();
-                    let ksize = blurRadius;
-                    if (ksize % 2 === 0) ksize += 1;
-                    cv.GaussianBlur(procMat, blurred, new cv.Size(ksize, ksize), 0);
+                    let ksize = blurRadius % 2 === 0 ? blurRadius + 1 : blurRadius;
+                    cv.GaussianBlur(enhanced, blurred, new cv.Size(ksize, ksize), 0);
                     
+                    // 4. Hough圆检测（关键改进：可调minDist）
                     let circles = new cv.Mat();
-                    cv.HoughCircles(blurred, circles, cv.HOUGH_GRADIENT, 1, 14, 45, param2, minRadius, maxRadius);
+                    cv.HoughCircles(blurred, circles, cv.HOUGH_GRADIENT, 1, minDist, 40, param2, minRadius, maxRadius);
                     
+                    // 5. 计算背景亮度（用于自适应阈值）
+                    let bgBrightness = 128;
+                    if (thresholdMode === 'adaptive') {
+                        let bgMean = cv.mean(enhanced);
+                        bgBrightness = bgMean[0];
+                    }
+                    
+                    // 6. 多特征验证
                     let detected = [];
                     if (circles.cols > 0) {
                         for (let i = 0; i < circles.cols; i++) {
@@ -735,48 +509,71 @@
                             const y = circles.data32F[i * 3 + 1];
                             const radius = circles.data32F[i * 3 + 2];
                             
-                            const x1 = Math.max(0, Math.floor(x - 3));
-                            const y1 = Math.max(0, Math.floor(y - 3));
-                            const x2 = Math.min(procMat.cols, Math.floor(x + 3));
-                            const y2 = Math.min(procMat.rows, Math.floor(y + 3));
-                            let roi = procMat.roi(new cv.Rect(x1, y1, x2 - x1, y2 - y1));
-                            let mean = cv.mean(roi);
-                            roi.delete();
+                            // 采样中心亮度
+                            const sampleR = Math.max(2, Math.floor(radius * 0.3));
+                            const x1 = Math.max(0, Math.floor(x - sampleR));
+                            const y1 = Math.max(0, Math.floor(y - sampleR));
+                            const x2 = Math.min(enhanced.cols, Math.floor(x + sampleR));
+                            const y2 = Math.min(enhanced.rows, Math.floor(y + sampleR));
+                            if (x2 <= x1 || y2 <= y1) continue;
                             
-                            if (mean[0] > 60) {
+                            let centerRoi = enhanced.roi(new cv.Rect(x1, y1, x2 - x1, y2 - y1));
+                            let centerMean = cv.mean(centerRoi);
+                            centerRoi.delete();
+                            const centerBrightness = centerMean[0];
+                            
+                            // 采样边缘亮度（验证圆形特征）
+                            let edgeBrightness = 0, edgeSamples = 0;
+                            for (let angle = 0; angle < Math.PI * 2; angle += Math.PI / 4) {
+                                const ex = Math.floor(x + Math.cos(angle) * radius * 0.8);
+                                const ey = Math.floor(y + Math.sin(angle) * radius * 0.8);
+                                if (ex > 0 && ex < enhanced.cols && ey > 0 && ey < enhanced.rows) {
+                                    edgeBrightness += enhanced.ucharAt(ey, ex);
+                                    edgeSamples++;
+                                }
+                            }
+                            edgeBrightness = edgeSamples > 0 ? edgeBrightness / edgeSamples : 0;
+                            
+                            // 亮度阈值判断
+                            let isValid = false;
+                            if (thresholdMode === 'adaptive') {
+                                isValid = centerBrightness > bgBrightness + adaptiveOffset && centerBrightness > edgeBrightness + edgeThreshold;
+                            } else if (thresholdMode === 'fixed') {
+                                isValid = centerBrightness > fixedThreshold && centerBrightness > edgeBrightness + edgeThreshold;
+                            } else { // relative
+                                isValid = centerBrightness > edgeBrightness + edgeThreshold;
+                            }
+                            
+                            if (isValid) {
                                 detected.push({
-                                    id: i,
-                                    x: x,
-                                    y: y,
-                                    radius: radius,
-                                    brightness: mean[0],
+                                    id: i, x: x, y: y, radius: radius,
+                                    brightness: centerBrightness,
+                                    confidence: (centerBrightness - edgeBrightness) / 255,
                                     manual: false
                                 });
                             }
                         }
                     }
                     
-                    // ROI过滤
+                    // 7. ROI过滤
                     if (roiCenter && roiRadius) {
                         detected = detected.filter(c => {
-                            const dx = c.x - roiCenter.x;
-                            const dy = c.y - roiCenter.y;
+                            const dx = c.x - roiCenter.x, dy = c.y - roiCenter.y;
                             return (dx*dx + dy*dy) <= (roiRadius * roiRadius);
                         });
                     }
                     
-                    // 合并重叠圆
-                    detected = mergeOverlappingCircles(detected, mergeDist);
+                    // 8. NMS合并
+                    detected = nonMaxSuppression(detected, mergeDist);
                     
                     colonies = detected;
                     
-                    procMat.delete();
-                    blurred.delete();
-                    circles.delete();
+                    // 清理
+                    procMat.delete(); enhanced.delete(); clahe.delete(); blurred.delete(); circles.delete();
                     
                     renderMarkers();
                     updateStats();
-                    showToast(`✅ 分析完成，检测到 ${colonies.length} 个菌落`);
+                    showToast(`✅ 检测到 ${colonies.length} 个菌落`);
                     
                 } catch (err) {
                     console.error(err);
@@ -786,42 +583,31 @@
             }, 100);
         }
         
-        function mergeOverlappingCircles(circles, minDist) {
+        function nonMaxSuppression(circles, minDist) {
             if (circles.length < 2) return circles;
-            let result = [];
-            let used = new Array(circles.length).fill(false);
+            circles.sort((a, b) => b.confidence - a.confidence);
+            let result = [], suppressed = new Array(circles.length).fill(false);
             for (let i = 0; i < circles.length; i++) {
-                if (used[i]) continue;
-                let current = circles[i];
+                if (suppressed[i]) continue;
+                result.push(circles[i]);
                 for (let j = i + 1; j < circles.length; j++) {
-                    if (used[j]) continue;
-                    const dx = current.x - circles[j].x;
-                    const dy = current.y - circles[j].y;
+                    if (suppressed[j]) continue;
+                    const dx = circles[i].x - circles[j].x, dy = circles[i].y - circles[j].y;
                     const dist = Math.sqrt(dx*dx + dy*dy);
-                    if (dist < minDist) {
-                        if (circles[j].radius > current.radius) {
-                            current = circles[j];
-                        }
-                        used[j] = true;
-                    }
+                    if (dist < minDist || dist < (circles[i].radius + circles[j].radius) * 0.5) suppressed[j] = true;
                 }
-                result.push(current);
-                used[i] = true;
             }
             return result;
         }
         
         function renderMarkers() {
-            overlayLayer.innerHTML = ''; 
-            overlayLayer.appendChild(roiVisual);
+            overlayLayer.innerHTML = ''; overlayLayer.appendChild(roiVisual);
             const zoom = parseFloat(document.getElementById('zoomSlider').value);
-            
             colonies.forEach((colony, idx) => {
                 const marker = document.createElement('div');
                 marker.className = `colony-marker ${colony.manual ? 'manual' : ''}`;
                 marker.style.left = (colony.x * zoom) + 'px';
                 marker.style.top = (colony.y * zoom) + 'px';
-                
                 if (showCircles) {
                     const circle = document.createElement('div');
                     circle.className = 'marker-circle';
@@ -829,29 +615,16 @@
                     circle.style.height = (colony.radius * zoom * 2) + 'px';
                     marker.appendChild(circle);
                 }
-                
-                const center = document.createElement('div');
-                center.className = 'marker-center';
-                marker.appendChild(center);
-                
-                const tooltip = document.createElement('div');
-                tooltip.className = 'marker-tooltip';
-                tooltip.textContent = `#${idx + 1} | r=${Math.round(colony.radius)}`;
-                marker.appendChild(tooltip);
-                
-                marker.onclick = (e) => {
-                    e.stopPropagation();
-                    removeColony(idx);
-                };
-                
+                const center = document.createElement('div'); center.className = 'marker-center'; marker.appendChild(center);
+                const tooltip = document.createElement('div'); tooltip.className = 'marker-tooltip'; tooltip.textContent = `#${idx + 1} | r=${Math.round(colony.radius)}`; marker.appendChild(tooltip);
+                marker.onclick = (e) => { e.stopPropagation(); removeColony(idx); };
                 overlayLayer.appendChild(marker);
             });
             if (roiCenter && roiRadius) updateRoiVisual();
         }
         
         function updateStats() {
-            const auto = colonies.filter(c => !c.manual).length;
-            const manual = colonies.filter(c => c.manual).length;
+            const auto = colonies.filter(c => !c.manual).length, manual = colonies.filter(c => c.manual).length;
             const avgRadius = colonies.length > 0 ? (colonies.reduce((sum, c) => sum + c.radius, 0) / colonies.length).toFixed(1) : 0;
             document.getElementById('statTotal').textContent = colonies.length;
             document.getElementById('statAuto').textContent = auto;
@@ -859,68 +632,32 @@
             document.getElementById('statAvgRadius').textContent = avgRadius;
         }
         
-        function removeColony(index) {
-            colonies.splice(index, 1);
-            colonies.forEach((c, idx) => c.id = idx);
-            renderMarkers();
-            updateStats();
-            showToast('🗑️ 已删除');
-        }
+        function removeColony(index) { colonies.splice(index, 1); colonies.forEach((c, idx) => c.id = idx); renderMarkers(); updateStats(); showToast('🗑️ 已删除'); }
         
         function toggleAddMode() {
             isAddMode = !isAddMode;
             const btn = document.getElementById('addModeBtn');
-            if (isAddMode) {
-                btn.style.background = 'var(--success)';
-                btn.innerHTML = '<span>✓</span><span>完成添加</span>';
-                canvas.style.cursor = 'crosshair';
-            } else {
-                btn.style.background = '';
-                btn.innerHTML = '<span>➕</span><span>手动添加</span>';
-                canvas.style.cursor = 'default';
-            }
+            if (isAddMode) { btn.style.background = 'var(--success)'; btn.innerHTML = '<span>✓</span><span>完成添加</span>'; canvas.style.cursor = 'crosshair'; }
+            else { btn.style.background = ''; btn.innerHTML = '<span>➕</span><span>手动添加</span>'; canvas.style.cursor = 'default'; }
         }
         
-        function toggleCircles() {
-            showCircles = !showCircles;
-            renderMarkers();
-            showToast(showCircles ? '⭕ 显示圆圈' : '⭕ 隐藏圆圈');
-        }
+        function toggleCircles() { showCircles = !showCircles; renderMarkers(); showToast(showCircles ? '⭕ 显示圆圈' : '⭕ 隐藏圆圈'); }
         
         function handleCanvasClick(e) {
             if (!isAddMode) return;
             const { x, y } = getImageCoordsFromEvent(e);
             const avgRadius = colonies.length > 0 ? colonies.reduce((sum, c) => sum + c.radius, 0) / colonies.length : 10;
-            colonies.push({
-                id: colonies.length,
-                x: x, y: y,
-                radius: avgRadius,
-                brightness: 255,
-                manual: true
-            });
-            renderMarkers();
-            updateStats();
-            showToast('✅ 已添加');
+            colonies.push({ id: colonies.length, x: x, y: y, radius: avgRadius, brightness: 255, manual: true });
+            renderMarkers(); updateStats(); showToast('✅ 已添加');
         }
         
-        function clearAll() {
-            if (confirm('确定清空所有标记？')) {
-                colonies = [];
-                renderMarkers();
-                updateStats();
-                showToast('🗑️ 已清空');
-            }
-        }
+        function clearAll() { if (confirm('确定清空所有标记？')) { colonies = []; renderMarkers(); updateStats(); showToast('🗑️ 已清空'); } }
         
         function resetApp() {
             if (srcMat) { srcMat.delete(); srcMat = null; }
             if (grayMat) { grayMat.delete(); grayMat = null; }
-            currentImage = null;
-            colonies = [];
-            isAddMode = false;
-            clearRoi();
-            uploadCard.style.display = 'block';
-            viewer.classList.remove('active');
+            currentImage = null; colonies = []; isAddMode = false; clearRoi();
+            uploadCard.style.display = 'block'; viewer.classList.remove('active');
             overlayLayer.innerHTML = ''; overlayLayer.appendChild(roiVisual);
             canvas.style.cursor = 'default';
         }
@@ -928,55 +665,24 @@
         function exportImage() {
             if (!currentImage) return;
             const exportCanvas = document.createElement('canvas');
-            exportCanvas.width = currentImage.width;
-            exportCanvas.height = currentImage.height;
+            exportCanvas.width = currentImage.width; exportCanvas.height = currentImage.height;
             const eCtx = exportCanvas.getContext('2d');
             eCtx.drawImage(currentImage, 0, 0);
-            eCtx.strokeStyle = '#00ff88';
-            eCtx.fillStyle = '#00ff88';
-            eCtx.lineWidth = 2;
             colonies.forEach(c => {
-                eCtx.beginPath();
-                eCtx.arc(c.x, c.y, c.radius, 0, 2 * Math.PI);
-                eCtx.strokeStyle = c.manual ? 'gold' : '#ff4757';
-                eCtx.stroke();
-                eCtx.beginPath();
-                eCtx.arc(c.x, c.y, 3, 0, 2 * Math.PI);
-                eCtx.fillStyle = c.manual ? 'gold' : '#00ff88';
-                eCtx.fill();
+                eCtx.beginPath(); eCtx.arc(c.x, c.y, c.radius, 0, 2 * Math.PI);
+                eCtx.strokeStyle = c.manual ? 'gold' : '#ff4757'; eCtx.lineWidth = 2; eCtx.stroke();
+                eCtx.beginPath(); eCtx.arc(c.x, c.y, 3, 0, 2 * Math.PI);
+                eCtx.fillStyle = c.manual ? 'gold' : '#00ff88'; eCtx.fill();
             });
-            const link = document.createElement('a');
-            link.download = `colonies_${Date.now()}.png`;
-            link.href = exportCanvas.toDataURL('image/png');
-            link.click();
+            const link = document.createElement('a'); link.download = `colonies_${Date.now()}.png`; link.href = exportCanvas.toDataURL('image/png'); link.click();
             showToast('📸 图片已导出');
         }
         
-        function showToast(msg) {
-            const toast = document.getElementById('toast');
-            toast.textContent = msg;
-            toast.classList.add('show');
-            setTimeout(() => toast.classList.remove('show'), 3000);
-        }
+        function showToast(msg) { const toast = document.getElementById('toast'); toast.textContent = msg; toast.classList.add('show'); setTimeout(() => toast.classList.remove('show'), 3000); }
         
-        // 窗口大小变化时重新适应（例如旋转屏幕）
-        window.addEventListener('resize', () => {
-            if (currentImage && viewer.classList.contains('active')) {
-                const containerWidth = imageWrapper.clientWidth;
-                let fitScale = containerWidth / currentImage.width;
-                fitScale = Math.min(3.0, Math.max(0.05, fitScale));
-                document.getElementById('zoomSlider').value = fitScale.toFixed(2);
-                document.getElementById('zoomValue').textContent = fitScale.toFixed(2);
-                applyZoom();
-            }
-        });
+        window.addEventListener('resize', () => { if (currentImage && viewer.classList.contains('active')) { const containerWidth = imageWrapper.clientWidth; let fitScale = containerWidth / currentImage.width; fitScale = Math.min(3.0, Math.max(0.05, fitScale)); document.getElementById('zoomSlider').value = fitScale.toFixed(2); document.getElementById('zoomValue').textContent = fitScale.toFixed(2); applyZoom(); } });
         
-        // PWA
-        if ('serviceWorker' in navigator) {
-            const swCode = `self.addEventListener('install',e=>self.skipWaiting()); self.addEventListener('activate',e=>e.waitUntil(clients.claim())); self.addEventListener('fetch',e=>e.respondWith(fetch(e.request)));`;
-            const blob = new Blob([swCode], { type: 'application/javascript' });
-            navigator.serviceWorker.register(URL.createObjectURL(blob)).catch(()=>{});
-        }
+        if ('serviceWorker' in navigator) { const swCode = `self.addEventListener('install',e=>self.skipWaiting()); self.addEventListener('activate',e=>e.waitUntil(clients.claim())); self.addEventListener('fetch',e=>e.respondWith(fetch(e.request)));`; const blob = new Blob([swCode], { type: 'application/javascript' }); navigator.serviceWorker.register(URL.createObjectURL(blob)).catch(()=>{}); }
     </script>
 </body>
 </html>
